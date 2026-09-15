@@ -1,0 +1,25 @@
+# 构建产物（脚本会生成，不进版本库）
+build/
+build-native/
+*.exe
+*.zip.bak
+
+# 验收 / 调试产物
+动效截图/
+*.png
+*-dump*.txt
+*.log
+
+# 编辑器 / 系统
+.vs/
+.vscode/
+*.user
+*.suo
+Thumbs.db
+desktop.ini
+
+# 打包临时目录
+fd-pack-*/
+
+# testdata 是验收夹具，里面的 .log / Thumbs.db 都是样本文件，要进库
+!testdata/**

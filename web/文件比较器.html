@@ -1,0 +1,1824 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>文件夹对比工具 - Folder Diff</title>
+    <!-- JSZip 用于打包ZIP -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js">
+    </script>
+    <!-- FileSaver 用于触发下载 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js">
+    </script>
+    <style>
+        :root {
+            --bg: #f5f6f8;
+            --card-bg: #ffffff;
+            --text: #2c3e50;
+            --text-secondary: #5a6c7d;
+            --border: #e2e6ea;
+            --primary: #4a6cf7;
+            --primary-hover: #3651d5;
+            --primary-light: #eef1fe;
+            --success: #10b981;
+            --success-bg: #ecfdf5;
+            --warning: #f59e0b;
+            --warning-bg: #fffbeb;
+            --danger: #ef4444;
+            --danger-bg: #fef2f2;
+            --info: #6366f1;
+            --info-bg: #eef2ff;
+            --export: #8b5cf6;
+            --export-hover: #7c3aed;
+            --export-bg: #f5f3ff;
+            --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
+            --shadow: 0 4px 16px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.04);
+            --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.1), 0 4px 8px rgba(0, 0, 0, 0.05);
+            --radius: 12px;
+            --radius-sm: 8px;
+            --radius-xs: 6px;
+            --transition: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            --font-mono: 'SF Mono', 'Cascadia Code', 'Fira Code', 'JetBrains Mono', 'Consolas', 'Monaco', 'Menlo',
+                monospace;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg: #1a1d23;
+                --card-bg: #21252b;
+                --text: #e1e4e8;
+                --text-secondary: #9aa0ab;
+                --border: #30363d;
+                --primary: #6d8aff;
+                --primary-hover: #8ba3ff;
+                --primary-light: #1c2440;
+                --success: #34d399;
+                --success-bg: #0a2e1f;
+                --warning: #fbbf24;
+                --warning-bg: #2d1f06;
+                --danger: #f87171;
+                --danger-bg: #2d0a0a;
+                --info: #818cf8;
+                --info-bg: #1a1e3a;
+                --export: #a78bfa;
+                --export-hover: #c4b5fd;
+                --export-bg: #1e1b4b;
+                --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3);
+                --shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+                --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.45);
+            }
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            line-height: 1.6;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        .app-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 24px 20px 60px;
+        }
+
+        /* Header */
+        .header {
+            text-align: center;
+            padding: 20px 0 32px;
+        }
+        .header .logo {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 28px;
+            font-weight: 700;
+            color: var(--primary);
+            letter-spacing: -0.5px;
+        }
+        .header .logo svg {
+            width: 36px;
+            height: 36px;
+            flex-shrink: 0;
+        }
+        .header .subtitle {
+            color: var(--text-secondary);
+            font-size: 14px;
+            margin-top: 4px;
+        }
+
+        /* Selector Area */
+        .selector-area {
+            display: grid;
+            grid-template-columns: 1fr auto 1fr;
+            gap: 20px;
+            align-items: center;
+            margin-bottom: 24px;
+        }
+        @media (max-width: 768px) {
+            .selector-area {
+                grid-template-columns: 1fr;
+                gap: 12px;
+            }
+            .vs-divider {
+                display: none;
+            }
+        }
+
+        .folder-card {
+            background: var(--card-bg);
+            border: 2px dashed var(--border);
+            border-radius: var(--radius);
+            padding: 28px 24px;
+            text-align: center;
+            cursor: pointer;
+            transition: all var(--transition);
+            position: relative;
+            min-height: 180px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            user-select: none;
+        }
+        .folder-card:hover {
+            border-color: var(--primary);
+            background: var(--primary-light);
+            box-shadow: var(--shadow-sm);
+        }
+        .folder-card.has-folder {
+            border-style: solid;
+            border-color: var(--primary);
+            background: var(--primary-light);
+            cursor: default;
+        }
+        .folder-card .folder-icon {
+            width: 56px;
+            height: 56px;
+            border-radius: var(--radius-sm);
+            background: var(--primary-light);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all var(--transition);
+        }
+        .folder-card.has-folder .folder-icon {
+            background: var(--primary);
+            color: #fff;
+        }
+        .folder-card .folder-icon svg {
+            width: 28px;
+            height: 28px;
+        }
+        .folder-card .folder-label {
+            font-weight: 600;
+            font-size: 15px;
+            color: var(--text);
+        }
+        .folder-card .folder-hint {
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+        .folder-card .folder-info {
+            font-size: 12px;
+            color: var(--primary);
+            font-weight: 500;
+            margin-top: 2px;
+        }
+        .folder-card .change-btn {
+            position: absolute;
+            top: 12px;
+            right: 14px;
+            font-size: 11px;
+            color: var(--text-secondary);
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 4px 10px;
+            cursor: pointer;
+            transition: all var(--transition);
+            display: none;
+            z-index: 2;
+        }
+        .folder-card.has-folder .change-btn {
+            display: inline-block;
+        }
+        .folder-card .change-btn:hover {
+            background: var(--danger-bg);
+            border-color: var(--danger);
+            color: var(--danger);
+        }
+        .folder-card input[type="file"] {
+            position: absolute;
+            inset: 0;
+            opacity: 0;
+            cursor: pointer;
+            z-index: 1;
+        }
+
+        .vs-divider {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 18px;
+            color: var(--text-secondary);
+            background: var(--card-bg);
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            box-shadow: var(--shadow-sm);
+            flex-shrink: 0;
+            border: 1px solid var(--border);
+        }
+
+        /* Action Bar */
+        .action-bar {
+            display: flex;
+            justify-content: center;
+            gap: 12px;
+            margin-bottom: 28px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 12px 28px;
+            border-radius: 28px;
+            font-size: 15px;
+            font-weight: 600;
+            border: none;
+            cursor: pointer;
+            transition: all var(--transition);
+            white-space: nowrap;
+            letter-spacing: 0.2px;
+        }
+        .btn-primary {
+            background: var(--primary);
+            color: #fff;
+            box-shadow: 0 4px 14px rgba(74, 108, 247, 0.35);
+        }
+        .btn-primary:hover:not(:disabled) {
+            background: var(--primary-hover);
+            box-shadow: 0 6px 20px rgba(74, 108, 247, 0.45);
+            transform: translateY(-1px);
+        }
+        .btn-primary:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            box-shadow: none;
+        }
+        .btn-secondary {
+            background: var(--card-bg);
+            color: var(--text);
+            border: 1px solid var(--border);
+        }
+        .btn-secondary:hover {
+            background: var(--bg);
+            border-color: #c0c7cf;
+        }
+        .btn-export {
+            background: var(--export-bg);
+            color: var(--export);
+            border: 1.5px solid var(--export);
+            box-shadow: 0 2px 8px rgba(139, 92, 246, 0.2);
+            font-weight: 600;
+        }
+        .btn-export:hover:not(:disabled) {
+            background: var(--export);
+            color: #fff;
+            box-shadow: 0 6px 20px rgba(139, 92, 246, 0.4);
+            transform: translateY(-1px);
+        }
+        .btn-export:disabled {
+            opacity: 0.45;
+            cursor: not-allowed;
+            box-shadow: none;
+        }
+        .btn-sm {
+            padding: 6px 14px;
+            font-size: 12px;
+            border-radius: 16px;
+            font-weight: 500;
+        }
+        .btn-sm-lg {
+            padding: 10px 20px;
+            font-size: 13px;
+            border-radius: 22px;
+            font-weight: 600;
+        }
+
+        /* Progress */
+        .progress-container {
+            display: none;
+            margin-bottom: 20px;
+        }
+        .progress-container.active {
+            display: block;
+        }
+        .progress-bar-wrapper {
+            background: var(--border);
+            border-radius: 10px;
+            height: 8px;
+            overflow: hidden;
+            margin-bottom: 8px;
+        }
+        .progress-bar-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--primary), #8b5cf6);
+            border-radius: 10px;
+            transition: width 0.3s ease;
+            width: 0%;
+        }
+        .progress-bar-fill.export-mode {
+            background: linear-gradient(90deg, #8b5cf6, #a78bfa, #10b981);
+        }
+        .progress-text {
+            font-size: 12px;
+            color: var(--text-secondary);
+            text-align: center;
+        }
+
+        /* Results Summary */
+        .results-summary {
+            display: none;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+        @media (max-width: 768px) {
+            .results-summary {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+        .results-summary.active {
+            display: grid;
+        }
+        .summary-item {
+            background: var(--card-bg);
+            border-radius: var(--radius-sm);
+            padding: 16px 18px;
+            text-align: center;
+            box-shadow: var(--shadow-sm);
+            border: 1px solid var(--border);
+        }
+        .summary-item .count {
+            font-size: 32px;
+            font-weight: 700;
+            letter-spacing: -1px;
+        }
+        .summary-item .label {
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-top: 2px;
+        }
+        .summary-item.type-modified .count {
+            color: var(--warning);
+        }
+        .summary-item.type-added .count {
+            color: var(--success);
+        }
+        .summary-item.type-removed .count {
+            color: var(--danger);
+        }
+        .summary-item.type-same .count {
+            color: var(--info);
+        }
+
+        /* Results Detail */
+        .results-detail {
+            display: none;
+            flex-direction: column;
+            gap: 16px;
+        }
+        .results-detail.active {
+            display: flex;
+        }
+
+        .result-section {
+            background: var(--card-bg);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow-sm);
+            border: 1px solid var(--border);
+            overflow: hidden;
+        }
+        .result-section-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 14px 18px;
+            cursor: pointer;
+            user-select: none;
+            transition: background var(--transition);
+            gap: 10px;
+        }
+        .result-section-header:hover {
+            background: var(--bg);
+        }
+        .result-section-header .section-title {
+            font-weight: 600;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .result-section-header .section-badge {
+            font-size: 12px;
+            padding: 3px 10px;
+            border-radius: 12px;
+            font-weight: 500;
+        }
+        .badge-modified {
+            background: var(--warning-bg);
+            color: #b45309;
+        }
+        .badge-added {
+            background: var(--success-bg);
+            color: #065f46;
+        }
+        .badge-removed {
+            background: var(--danger-bg);
+            color: #991b1b;
+        }
+        .badge-same {
+            background: var(--info-bg);
+            color: #3730a3;
+        }
+        @media (prefers-color-scheme: dark) {
+            .badge-modified {
+                color: #fbbf24;
+            }
+            .badge-added {
+                color: #34d399;
+            }
+            .badge-removed {
+                color: #f87171;
+            }
+            .badge-same {
+                color: #a5b4fc;
+            }
+        }
+        .result-section-header .collapse-icon {
+            transition: transform var(--transition);
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+        .result-section.collapsed .result-section-header .collapse-icon {
+            transform: rotate(-90deg);
+        }
+        .result-section-body {
+            border-top: 1px solid var(--border);
+            max-height: 600px;
+            overflow-y: auto;
+            transition: max-height var(--transition), padding var(--transition);
+        }
+        .result-section.collapsed .result-section-body {
+            max-height: 0;
+            overflow: hidden;
+            border-top: none;
+        }
+        .file-item {
+            padding: 10px 18px;
+            border-bottom: 1px solid var(--border);
+            font-size: 13px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            transition: background var(--transition);
+            cursor: default;
+        }
+        .file-item:last-child {
+            border-bottom: none;
+        }
+        .file-item:hover {
+            background: var(--bg);
+        }
+        .file-item .file-path {
+            flex: 1;
+            font-family: var(--font-mono);
+            font-size: 12px;
+            word-break: break-all;
+            color: var(--text);
+        }
+        .file-item .file-size {
+            font-size: 11px;
+            color: var(--text-secondary);
+            white-space: nowrap;
+            flex-shrink: 0;
+        }
+        .file-item .file-action {
+            font-size: 11px;
+            cursor: pointer;
+            color: var(--primary);
+            white-space: nowrap;
+            flex-shrink: 0;
+            padding: 4px 8px;
+            border-radius: 4px;
+            transition: all var(--transition);
+            font-weight: 500;
+        }
+        .file-item .file-action:hover {
+            background: var(--primary-light);
+            text-decoration: underline;
+        }
+        .file-item.modified-item {
+            border-left: 3px solid var(--warning);
+        }
+        .file-item.added-item {
+            border-left: 3px solid var(--success);
+        }
+        .file-item.removed-item {
+            border-left: 3px solid var(--danger);
+        }
+        .file-item.same-item {
+            border-left: 3px solid var(--info);
+        }
+
+        /* Diff Modal */
+        .diff-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.55);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        .diff-overlay.active {
+            display: flex;
+        }
+        .diff-modal {
+            background: var(--card-bg);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow-lg);
+            width: 100%;
+            max-width: 1000px;
+            max-height: 85vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        .diff-modal-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--border);
+            gap: 12px;
+        }
+        .diff-modal-header .diff-title {
+            font-weight: 600;
+            font-size: 14px;
+            font-family: var(--font-mono);
+            word-break: break-all;
+            flex: 1;
+            min-width: 0;
+        }
+        .diff-modal-close {
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 22px;
+            color: var(--text-secondary);
+            padding: 4px 8px;
+            border-radius: 4px;
+            transition: all var(--transition);
+            line-height: 1;
+            flex-shrink: 0;
+        }
+        .diff-modal-close:hover {
+            background: var(--danger-bg);
+            color: var(--danger);
+        }
+        .diff-modal-body {
+            flex: 1;
+            overflow: auto;
+            padding: 0;
+            font-family: var(--font-mono);
+            font-size: 12px;
+            line-height: 1.7;
+        }
+        .diff-table {
+            width: 100%;
+            border-collapse: collapse;
+            table-layout: fixed;
+        }
+        .diff-table td {
+            padding: 2px 8px;
+            vertical-align: top;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+        .diff-table .line-num {
+            width: 50px;
+            text-align: right;
+            color: var(--text-secondary);
+            user-select: none;
+            font-size: 11px;
+            padding-right: 10px;
+            background: var(--bg);
+            border-right: 1px solid var(--border);
+            flex-shrink: 0;
+        }
+        .diff-table .line-content {
+            padding-left: 12px;
+        }
+        .diff-table .diff-added {
+            background: #d4fcdc;
+        }
+        .diff-table .diff-removed {
+            background: #ffe0e0;
+        }
+        .diff-table .diff-context {
+            background: transparent;
+        }
+        @media (prefers-color-scheme: dark) {
+            .diff-table .diff-added {
+                background: #0a3d1f;
+            }
+            .diff-table .diff-removed {
+                background: #3d0a0a;
+            }
+            .diff-table .diff-context {
+                background: transparent;
+            }
+        }
+        .diff-table .diff-marker {
+            font-weight: 700;
+            width: 20px;
+            text-align: center;
+            user-select: none;
+            flex-shrink: 0;
+        }
+        .diff-added .diff-marker {
+            color: #10b981;
+        }
+        .diff-removed .diff-marker {
+            color: #ef4444;
+        }
+
+        /* Toast */
+        .toast {
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%) translateY(100px);
+            background: #1e293b;
+            color: #fff;
+            padding: 10px 22px;
+            border-radius: 24px;
+            font-size: 13px;
+            font-weight: 500;
+            z-index: 2000;
+            pointer-events: none;
+            transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+        }
+        @media (prefers-color-scheme: dark) {
+            .toast {
+                background: #e2e8f0;
+                color: #1e293b;
+            }
+        }
+        .toast.show {
+            transform: translateX(-50%) translateY(0);
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #c8cdd4;
+            border-radius: 3px;
+        }
+        @media (prefers-color-scheme: dark) {
+            ::-webkit-scrollbar-thumb {
+                background: #4a5568;
+            }
+        }
+
+        /* Empty state */
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: var(--text-secondary);
+            font-size: 14px;
+        }
+        .empty-state svg {
+            width: 48px;
+            height: 48px;
+            opacity: 0.4;
+            margin-bottom: 12px;
+        }
+
+        /* Loading spinner */
+        .spinner {
+            display: inline-block;
+            width: 18px;
+            height: 18px;
+            border: 2px solid var(--border);
+            border-top-color: var(--primary);
+            border-radius: 50%;
+            animation: spin 0.7s linear infinite;
+        }
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        /* Export info banner */
+        .export-info-banner {
+            display: none;
+            background: var(--export-bg);
+            border: 1px solid var(--export);
+            border-radius: var(--radius-sm);
+            padding: 10px 16px;
+            margin-bottom: 16px;
+            font-size: 13px;
+            color: var(--export);
+            text-align: center;
+            font-weight: 500;
+        }
+        .export-info-banner.active {
+            display: block;
+        }
+        @media (prefers-color-scheme: dark) {
+            .export-info-banner {
+                color: #c4b5fd;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <div class="header">
+            <div class="logo">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z" />
+                    <line x1="12" y1="11" x2="12" y2="17" />
+                    <line x1="9" y1="14" x2="15" y2="14" />
+                </svg>
+                文件夹对比工具
+            </div>
+            <p class="subtitle">选择两个文件夹，快速找出文件差异 · 支持文本内容逐行对比 · 可导出差异文件</p>
+        </div>
+
+        <!-- Selector Area -->
+        <div class="selector-area">
+            <!-- Folder A -->
+            <div class="folder-card" id="folderCardA">
+                <div class="folder-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                        <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2v11z" />
+                    </svg>
+                </div>
+                <div class="folder-label">文件夹 A</div>
+                <div class="folder-hint">点击此处选择文件夹</div>
+                <div class="folder-info" id="folderInfoA"></div>
+                <button class="change-btn" id="changeBtnA" title="更换文件夹">✕ 更换</button>
+                <input type="file" id="inputFolderA" webkitdirectory multiple title="">
+            </div>
+
+            <!-- VS -->
+            <div class="vs-divider">VS</div>
+
+            <!-- Folder B -->
+            <div class="folder-card" id="folderCardB">
+                <div class="folder-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                        <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2v11z" />
+                    </svg>
+                </div>
+                <div class="folder-label">文件夹 B</div>
+                <div class="folder-hint">点击此处选择文件夹</div>
+                <div class="folder-info" id="folderInfoB"></div>
+                <button class="change-btn" id="changeBtnB" title="更换文件夹">✕ 更换</button>
+                <input type="file" id="inputFolderB" webkitdirectory multiple title="">
+            </div>
+        </div>
+
+        <!-- Action Bar -->
+        <div class="action-bar">
+            <button class="btn btn-primary" id="btnCompare" disabled>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                    <circle cx="11" cy="11" r="8" />
+                    <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                </svg>
+                开始对比
+            </button>
+            <button class="btn btn-export btn-sm-lg" id="btnExport" style="display:none;" disabled>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                    <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
+                    <polyline points="7 10 12 15 17 10" />
+                    <line x1="12" y1="15" x2="12" y2="3" />
+                </svg>
+                导出差异文件 (ZIP)
+            </button>
+            <button class="btn btn-secondary btn-sm" id="btnClear" style="display:none;">
+                清除结果
+            </button>
+        </div>
+
+        <!-- Export info banner -->
+        <div class="export-info-banner" id="exportInfoBanner">
+            📦 导出内容包括：内容不同的文件（A/B两版）、仅在A中的文件、仅在B中的文件
+        </div>
+
+        <!-- Progress -->
+        <div class="progress-container" id="progressContainer">
+            <div class="progress-bar-wrapper">
+                <div class="progress-bar-fill" id="progressBar"></div>
+            </div>
+            <div class="progress-text" id="progressText">准备中...</div>
+        </div>
+
+        <!-- Results Summary -->
+        <div class="results-summary" id="resultsSummary">
+            <div class="summary-item type-modified">
+                <div class="count" id="countModified">0</div>
+                <div class="label">内容不同</div>
+            </div>
+            <div class="summary-item type-added">
+                <div class="count" id="countOnlyInB">0</div>
+                <div class="label">仅在B中存在</div>
+            </div>
+            <div class="summary-item type-removed">
+                <div class="count" id="countOnlyInA">0</div>
+                <div class="label">仅在A中存在</div>
+            </div>
+            <div class="summary-item type-same">
+                <div class="count" id="countSame">0</div>
+                <div class="label">完全相同</div>
+            </div>
+        </div>
+
+        <!-- Results Detail -->
+        <div class="results-detail" id="resultsDetail">
+            <!-- Modified files -->
+            <div class="result-section" id="sectionModified">
+                <div class="result-section-header" data-section="modified">
+                    <span class="section-title">
+                        ⚠️ 内容不同的文件
+                        <span class="section-badge badge-modified" id="badgeModified">0</span>
+                    </span>
+                    <span class="collapse-icon">▼</span>
+                </div>
+                <div class="result-section-body" id="bodyModified"></div>
+            </div>
+            <!-- Only in B -->
+            <div class="result-section" id="sectionOnlyB">
+                <div class="result-section-header" data-section="onlyB">
+                    <span class="section-title">
+                        ➕ 仅在文件夹B中存在的文件
+                        <span class="section-badge badge-added" id="badgeOnlyB">0</span>
+                    </span>
+                    <span class="collapse-icon">▼</span>
+                </div>
+                <div class="result-section-body" id="bodyOnlyB"></div>
+            </div>
+            <!-- Only in A -->
+            <div class="result-section" id="sectionOnlyA">
+                <div class="result-section-header" data-section="onlyA">
+                    <span class="section-title">
+                        ➖ 仅在文件夹A中存在的文件
+                        <span class="section-badge badge-removed" id="badgeOnlyA">0</span>
+                    </span>
+                    <span class="collapse-icon">▼</span>
+                </div>
+                <div class="result-section-body" id="bodyOnlyA"></div>
+            </div>
+            <!-- Same files -->
+            <div class="result-section collapsed" id="sectionSame">
+                <div class="result-section-header" data-section="same">
+                    <span class="section-title">
+                        ✅ 完全相同的文件
+                        <span class="section-badge badge-same" id="badgeSame">0</span>
+                    </span>
+                    <span class="collapse-icon">▼</span>
+                </div>
+                <div class="result-section-body" id="bodySame"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Diff Modal -->
+    <div class="diff-overlay" id="diffOverlay">
+        <div class="diff-modal">
+            <div class="diff-modal-header">
+                <span class="diff-title" id="diffTitle"></span>
+                <button class="diff-modal-close" id="diffClose">✕</button>
+            </div>
+            <div class="diff-modal-body" id="diffBody"></div>
+        </div>
+    </div>
+
+    <!-- Toast -->
+    <div class="toast" id="toast"></div>
+
+    <script>
+        (function() {
+            // ──────────────────────────────────────
+            // DOM 元素引用
+            // ──────────────────────────────────────
+            const folderCardA = document.getElementById('folderCardA');
+            const folderCardB = document.getElementById('folderCardB');
+            const inputFolderA = document.getElementById('inputFolderA');
+            const inputFolderB = document.getElementById('inputFolderB');
+            const folderInfoA = document.getElementById('folderInfoA');
+            const folderInfoB = document.getElementById('folderInfoB');
+            const changeBtnA = document.getElementById('changeBtnA');
+            const changeBtnB = document.getElementById('changeBtnB');
+            const btnCompare = document.getElementById('btnCompare');
+            const btnClear = document.getElementById('btnClear');
+            const btnExport = document.getElementById('btnExport');
+            const exportInfoBanner = document.getElementById('exportInfoBanner');
+            const progressContainer = document.getElementById('progressContainer');
+            const progressBar = document.getElementById('progressBar');
+            const progressText = document.getElementById('progressText');
+            const resultsSummary = document.getElementById('resultsSummary');
+            const resultsDetail = document.getElementById('resultsDetail');
+            const diffOverlay = document.getElementById('diffOverlay');
+            const diffTitle = document.getElementById('diffTitle');
+            const diffBody = document.getElementById('diffBody');
+            const diffClose = document.getElementById('diffClose');
+            const toast = document.getElementById('toast');
+
+            // 计数元素
+            const countModified = document.getElementById('countModified');
+            const countOnlyInB = document.getElementById('countOnlyInB');
+            const countOnlyInA = document.getElementById('countOnlyInA');
+            const countSame = document.getElementById('countSame');
+            const badgeModified = document.getElementById('badgeModified');
+            const badgeOnlyB = document.getElementById('badgeOnlyB');
+            const badgeOnlyA = document.getElementById('badgeOnlyA');
+            const badgeSame = document.getElementById('badgeSame');
+
+            // Section body 元素
+            const bodyModified = document.getElementById('bodyModified');
+            const bodyOnlyB = document.getElementById('bodyOnlyB');
+            const bodyOnlyA = document.getElementById('bodyOnlyA');
+            const bodySame = document.getElementById('bodySame');
+
+            // ──────────────────────────────────────
+            // 状态管理
+            // ──────────────────────────────────────
+            let folderAFiles = null; // Map<relativePath, File>
+            let folderBFiles = null; // Map<relativePath, File>
+            let folderAName = '';
+            let folderBName = '';
+            let compareResults = null; // 对比结果缓存
+            let isExporting = false; // 是否正在导出
+
+            // ──────────────────────────────────────
+            // 工具函数
+            // ──────────────────────────────────────
+            function formatFileSize(bytes) {
+                if (bytes < 1024) return bytes + ' B';
+                if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+                if (bytes < 1024 * 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
+                return (bytes / (1024 * 1024 * 1024)).toFixed(2) + ' GB';
+            }
+
+            function showToast(msg, duration = 2200) {
+                toast.textContent = msg;
+                toast.classList.add('show');
+                clearTimeout(toast._timeout);
+                toast._timeout = setTimeout(() => {
+                    toast.classList.remove('show');
+                }, duration);
+            }
+
+            function escapeHtml(str) {
+                const div = document.createElement('div');
+                div.textContent = str;
+                return div.innerHTML;
+            }
+
+            /** 生成时间戳字符串，用于ZIP文件名 */
+            function getTimestamp() {
+                const now = new Date();
+                const pad = (n) => String(n).padStart(2, '0');
+                return `${now.getFullYear()}${pad(now.getMonth()+1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+            }
+
+            // ──────────────────────────────────────
+            // 文本文件扩展名白名单
+            // ──────────────────────────────────────
+            const TEXT_EXTENSIONS = new Set([
+                'txt', 'html', 'htm', 'css', 'js', 'jsx', 'ts', 'tsx', 'json', 'xml', 'md',
+                'markdown', 'yaml', 'yml', 'toml', 'ini', 'cfg', 'conf', 'log', 'csv', 'tsv',
+                'py', 'java', 'c', 'cpp', 'cc', 'cxx', 'h', 'hpp', 'hxx', 'cs', 'rb', 'php',
+                'go', 'rs', 'swift', 'kt', 'kts', 'scala', 'sh', 'bash', 'zsh', 'bat', 'ps1',
+                'sql', 'r', 'm', 'mm', 'pl', 'pm', 'lua', 'vim', 'gitignore', 'gitattributes',
+                'editorconfig', 'env', 'properties', 'gradle', 'sbt', 'dockerfile', 'makefile',
+                'cmake', 'tex', 'bib', 'rst', 'org', 'el', 'clj', 'cljs', 'edn', 'hs', 'lhs',
+                'ml', 'mli', 'fs', 'fsx', 'vb', 'asp', 'aspx', 'jsp', 'vue', 'svelte', 'astro',
+                'njk', 'nunjucks', 'ejs', 'hbs', 'handlebars', 'mustache', 'pug', 'jade',
+                'scss', 'sass', 'less', 'styl', 'stylus', 'coffee', 'litcoffee', 'ls',
+                'svg', 'graphql', 'gql', 'prisma', 'proto', 'thrift', 'avsc',
+            ]);
+
+            function isTextFile(filename) {
+                const ext = filename.split('.').pop()?.toLowerCase() || '';
+                if (TEXT_EXTENSIONS.has(ext)) return true;
+                const basename = filename.toLowerCase();
+                if (TEXT_EXTENSIONS.has(basename)) return true;
+                return false;
+            }
+
+            // ──────────────────────────────────────
+            // 文件夹选择处理
+            // ──────────────────────────────────────
+            function processFolderSelection(inputEl, cardEl, infoEl, changeBtnEl, setFilesFn, setNameFn) {
+                const files = inputEl.files;
+                if (!files || files.length === 0) return;
+
+                const fileMap = new Map();
+                let folderName = '';
+                let totalSize = 0;
+                const seenPaths = new Set();
+
+                for (const file of files) {
+                    const rawPath = file.webkitRelativePath || file.name;
+                    const parts = rawPath.split('/');
+                    if (parts.length >= 1) {
+                        if (!folderName) folderName = parts[0];
+                        const relativePath = parts.slice(1).join('/');
+                        if (relativePath && !seenPaths.has(relativePath)) {
+                            seenPaths.add(relativePath);
+                            fileMap.set(relativePath, file);
+                            totalSize += file.size;
+                        } else if (!relativePath && parts.length === 1) {
+                            const fname = parts[0];
+                            if (!seenPaths.has(fname)) {
+                                seenPaths.add(fname);
+                                fileMap.set(fname, file);
+                                totalSize += file.size;
+                                if (!folderName) folderName = fname;
+                            }
+                        }
+                    }
+                }
+
+                if (!folderName && files.length > 0) {
+                    folderName = files[0].webkitRelativePath?.split('/')[0] || '未知文件夹';
+                }
+
+                setFilesFn(fileMap);
+                setNameFn(folderName);
+
+                cardEl.classList.add('has-folder');
+                infoEl.textContent = `${fileMap.size} 个文件 · ${formatFileSize(totalSize)}`;
+                changeBtnEl.style.display = 'inline-block';
+                inputEl.value = '';
+
+                updateCompareButton();
+            }
+
+            function resetFolder(cardEl, infoEl, changeBtnEl, setFilesFn, setNameFn) {
+                setFilesFn(null);
+                setNameFn('');
+                cardEl.classList.remove('has-folder');
+                infoEl.textContent = '';
+                changeBtnEl.style.display = 'none';
+                updateCompareButton();
+                clearResults();
+            }
+
+            function updateCompareButton() {
+                btnCompare.disabled = !(folderAFiles && folderBFiles);
+            }
+
+            function clearResults() {
+                compareResults = null;
+                resultsSummary.classList.remove('active');
+                resultsDetail.classList.remove('active');
+                bodyModified.innerHTML = '';
+                bodyOnlyB.innerHTML = '';
+                bodyOnlyA.innerHTML = '';
+                bodySame.innerHTML = '';
+                countModified.textContent = '0';
+                countOnlyInB.textContent = '0';
+                countOnlyInA.textContent = '0';
+                countSame.textContent = '0';
+                badgeModified.textContent = '0';
+                badgeOnlyB.textContent = '0';
+                badgeOnlyA.textContent = '0';
+                badgeSame.textContent = '0';
+                document.getElementById('sectionSame').classList.add('collapsed');
+                btnClear.style.display = 'none';
+                btnExport.style.display = 'none';
+                btnExport.disabled = true;
+                exportInfoBanner.classList.remove('active');
+                progressContainer.classList.remove('active');
+                progressBar.classList.remove('export-mode');
+                progressBar.style.width = '0%';
+            }
+
+            // ──────────────────────────────────────
+            // 事件绑定 - 文件夹选择
+            // ──────────────────────────────────────
+            inputFolderA.addEventListener('change', () => {
+                processFolderSelection(inputFolderA, folderCardA, folderInfoA, changeBtnA,
+                    (m) => { folderAFiles = m; },
+                    (n) => { folderAName = n; });
+            });
+
+            inputFolderB.addEventListener('change', () => {
+                processFolderSelection(inputFolderB, folderCardB, folderInfoB, changeBtnB,
+                    (m) => { folderBFiles = m; },
+                    (n) => { folderBName = n; });
+            });
+
+            changeBtnA.addEventListener('click', (e) => {
+                e.stopPropagation();
+                resetFolder(folderCardA, folderInfoA, changeBtnA,
+                    (m) => { folderAFiles = m; },
+                    (n) => { folderAName = n; });
+            });
+
+            changeBtnB.addEventListener('click', (e) => {
+                e.stopPropagation();
+                resetFolder(folderCardB, folderInfoB, changeBtnB,
+                    (m) => { folderBFiles = m; },
+                    (n) => { folderBName = n; });
+            });
+
+            folderCardA.addEventListener('click', (e) => {
+                if (!folderAFiles && e.target !== changeBtnA && e.target !== inputFolderA) {
+                    inputFolderA.click();
+                }
+            });
+            folderCardB.addEventListener('click', (e) => {
+                if (!folderBFiles && e.target !== changeBtnB && e.target !== inputFolderB) {
+                    inputFolderB.click();
+                }
+            });
+
+            // ──────────────────────────────────────
+            // 文件内容比较
+            // ──────────────────────────────────────
+            async function compareFileContents(fileA, fileB) {
+                if (fileA.size !== fileB.size) {
+                    return { same: false, sizeDiff: true, sizeA: fileA.size, sizeB: fileB.size };
+                }
+                const SIZE_LIMIT = 50 * 1024 * 1024; // 50MB
+                if (fileA.size > SIZE_LIMIT) {
+                    return {
+                        same: null,
+                        tooLarge: true,
+                        size: fileA.size,
+                        message: '文件过大（>50MB），仅比较了大小，两者大小相同但无法逐字节确认'
+                    };
+                }
+                try {
+                    const bufferA = await readFileAsArrayBuffer(fileA);
+                    const bufferB = await readFileAsArrayBuffer(fileB);
+                    if (bufferA.byteLength !== bufferB.byteLength) {
+                        return { same: false, sizeDiff: true, sizeA: bufferA.byteLength, sizeB: bufferB.byteLength };
+                    }
+                    const viewA = new Uint8Array(bufferA);
+                    const viewB = new Uint8Array(bufferB);
+                    for (let i = 0; i < viewA.length; i++) {
+                        if (viewA[i] !== viewB[i]) {
+                            return {
+                                same: false,
+                                sizeDiff: false,
+                                sizeA: fileA.size,
+                                sizeB: fileB.size,
+                                firstDiffByte: i
+                            };
+                        }
+                    }
+                    return { same: true, size: fileA.size };
+                } catch (err) {
+                    return { same: null, error: err.message };
+                }
+            }
+
+            function readFileAsArrayBuffer(file) {
+                return new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = () => resolve(reader.result);
+                    reader.onerror = () => reject(new Error('读取文件失败: ' + file.name));
+                    reader.readAsArrayBuffer(file);
+                });
+            }
+
+            function readFileAsText(file) {
+                return new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = () => resolve(reader.result);
+                    reader.onerror = () => reject(new Error('读取文件失败: ' + file.name));
+                    reader.readAsText(file, 'UTF-8');
+                });
+            }
+
+            // ──────────────────────────────────────
+            // 简单的 Diff 算法 (基于LCS)
+            // ──────────────────────────────────────
+            function computeDiff(linesA, linesB) {
+                const m = linesA.length;
+                const n = linesB.length;
+                const MAX_LINES = 800;
+                if (m > MAX_LINES || n > MAX_LINES) {
+                    return computeSimpleDiff(linesA, linesB);
+                }
+                return computeLCSDiff(linesA, linesB, m, n);
+            }
+
+            function computeLCSDiff(linesA, linesB, m, n) {
+                const dp = new Array(m + 1);
+                for (let i = 0; i <= m; i++) {
+                    dp[i] = new Uint16Array(n + 1);
+                }
+                for (let i = 1; i <= m; i++) {
+                    for (let j = 1; j <= n; j++) {
+                        if (linesA[i - 1] === linesB[j - 1]) {
+                            dp[i][j] = dp[i - 1][j - 1] + 1;
+                        } else {
+                            dp[i][j] = Math.max(dp[i - 1][j], dp[i][j - 1]);
+                        }
+                    }
+                }
+                const diff = [];
+                let i = m,
+                    j = n;
+                const temp = [];
+                while (i > 0 || j > 0) {
+                    if (i > 0 && j > 0 && linesA[i - 1] === linesB[j - 1]) {
+                        temp.push({ type: 'equal', lineA: linesA[i - 1], lineB: linesB[j - 1], indexA: i - 1,
+                            indexB: j - 1 });
+                        i--;
+                        j--;
+                    } else if (j > 0 && (i === 0 || dp[i][j - 1] >= dp[i - 1][j])) {
+                        temp.push({ type: 'added', lineB: linesB[j - 1], indexB: j - 1 });
+                        j--;
+                    } else {
+                        temp.push({ type: 'removed', lineA: linesA[i - 1], indexA: i - 1 });
+                        i--;
+                    }
+                }
+                return temp.reverse();
+            }
+
+            function computeSimpleDiff(linesA, linesB) {
+                const diff = [];
+                const maxLen = Math.max(linesA.length, linesB.length);
+                const minLen = Math.min(linesA.length, linesB.length);
+                for (let i = 0; i < minLen; i++) {
+                    if (linesA[i] === linesB[i]) {
+                        diff.push({ type: 'equal', lineA: linesA[i], lineB: linesB[i], indexA: i, indexB: i });
+                    } else {
+                        diff.push({ type: 'removed', lineA: linesA[i], indexA: i });
+                        diff.push({ type: 'added', lineB: linesB[i], indexB: i });
+                    }
+                }
+                for (let i = minLen; i < linesA.length; i++) {
+                    diff.push({ type: 'removed', lineA: linesA[i], indexA: i });
+                }
+                for (let i = minLen; i < linesB.length; i++) {
+                    diff.push({ type: 'added', lineB: linesB[i], indexB: i });
+                }
+                return diff;
+            }
+
+            // ──────────────────────────────────────
+            // 渲染Diff视图
+            // ──────────────────────────────────────
+            function renderDiffView(diffEntries, fileAName, fileBName) {
+                let html = '<table class="diff-table"><tbody>';
+                let lineNumA = 1;
+                let lineNumB = 1;
+                const contextWindow = 2;
+                const totalEntries = diffEntries.length;
+
+                const showFlags = new Array(totalEntries).fill(false);
+                for (let i = 0; i < totalEntries; i++) {
+                    if (diffEntries[i].type !== 'equal') {
+                        const start = Math.max(0, i - contextWindow);
+                        const end = Math.min(totalEntries - 1, i + contextWindow);
+                        for (let j = start; j <= end; j++) {
+                            showFlags[j] = true;
+                        }
+                    }
+                }
+
+                let lastShown = -2;
+                for (let i = 0; i < totalEntries; i++) {
+                    const entry = diffEntries[i];
+                    if (!showFlags[i]) {
+                        if (entry.type === 'equal' || entry.type === 'removed') lineNumA++;
+                        if (entry.type === 'equal' || entry.type === 'added') lineNumB++;
+                        if (lastShown < i - 1 && showFlags[i] && i > 0 && lastShown >= 0) {
+                            html +=
+                                `<tr><td class="line-num" style="text-align:center;color:var(--text-secondary);">···</td><td class="line-content" style="text-align:center;color:var(--text-secondary);font-style:italic;">省略了 ${i - lastShown - 1} 行相同内容</td><td class="line-num" style="text-align:center;color:var(--text-secondary);">···</td></tr>`;
+                        }
+                        lastShown = i;
+                        continue;
+                    }
+                    lastShown = i;
+
+                    if (entry.type === 'equal') {
+                        html += `<tr class="diff-context">
+                            <td class="line-num">${lineNumA}</td>
+                            <td class="line-content">${escapeHtml(entry.lineA)}</td>
+                            <td class="line-num">${lineNumB}</td>
+                        </tr>`;
+                        lineNumA++;
+                        lineNumB++;
+                    } else if (entry.type === 'removed') {
+                        html += `<tr class="diff-removed">
+                            <td class="line-num">${lineNumA}</td>
+                            <td class="diff-marker">-</td>
+                            <td class="line-content">${escapeHtml(entry.lineA)}</td>
+                        </tr>`;
+                        lineNumA++;
+                    } else if (entry.type === 'added') {
+                        html += `<tr class="diff-added">
+                            <td class="line-num"></td>
+                            <td class="diff-marker">+</td>
+                            <td class="line-content">${escapeHtml(entry.lineB)}</td>
+                            <td class="line-num">${lineNumB}</td>
+                        </tr>`;
+                        lineNumB++;
+                    }
+                }
+                html += '</tbody></table>';
+                return html;
+            }
+
+            // ──────────────────────────────────────
+            // 打开Diff弹窗
+            // ──────────────────────────────────────
+            async function openDiffModal(relativePath, fileA, fileB) {
+                diffTitle.textContent = `📄 ${relativePath}`;
+                diffBody.innerHTML =
+                    '<div style="text-align:center;padding:40px;"><span class="spinner"></span> 正在加载差异...</div>';
+                diffOverlay.classList.add('active');
+                document.body.style.overflow = 'hidden';
+
+                try {
+                    const textA = await readFileAsText(fileA);
+                    const textB = await readFileAsText(fileB);
+                    const linesA = textA.split('\n');
+                    const linesB = textB.split('\n');
+                    const diffEntries = computeDiff(linesA, linesB);
+                    const diffHtml = renderDiffView(diffEntries, folderAName, folderBName);
+                    diffBody.innerHTML = diffHtml;
+                } catch (err) {
+                    diffBody.innerHTML =
+                        `<div class="empty-state">⚠️ 无法读取文件内容进行文本对比<br><small>${escapeHtml(err.message)}</small></div>`;
+                }
+            }
+
+            function closeDiffModal() {
+                diffOverlay.classList.remove('active');
+                document.body.style.overflow = '';
+                diffBody.innerHTML = '';
+            }
+
+            diffClose.addEventListener('click', closeDiffModal);
+            diffOverlay.addEventListener('click', (e) => {
+                if (e.target === diffOverlay) closeDiffModal();
+            });
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape' && diffOverlay.classList.contains('active')) {
+                    closeDiffModal();
+                }
+            });
+
+            // ──────────────────────────────────────
+            // 主对比逻辑
+            // ──────────────────────────────────────
+            btnCompare.addEventListener('click', async () => {
+                if (!folderAFiles || !folderBFiles) return;
+                await performComparison();
+            });
+
+            async function performComparison() {
+                clearResults();
+                progressContainer.classList.add('active');
+                progressBar.classList.remove('export-mode');
+                progressBar.style.width = '0%';
+                progressText.textContent = '正在分析文件列表...';
+                btnCompare.disabled = true;
+
+                const allPaths = new Set([...folderAFiles.keys(), ...folderBFiles.keys()]);
+                const pathList = [...allPaths].sort();
+                const totalPaths = pathList.length;
+
+                const onlyInA = [];
+                const onlyInB = [];
+                const modified = [];
+                const same = [];
+                const errors = [];
+
+                let processed = 0;
+                await new Promise(r => setTimeout(r, 50));
+
+                for (const relativePath of pathList) {
+                    const fileA = folderAFiles.get(relativePath);
+                    const fileB = folderBFiles.get(relativePath);
+
+                    if (fileA && !fileB) {
+                        onlyInA.push({ path: relativePath, size: fileA.size, file: fileA });
+                    } else if (!fileA && fileB) {
+                        onlyInB.push({ path: relativePath, size: fileB.size, file: fileB });
+                    } else if (fileA && fileB) {
+                        const result = await compareFileContents(fileA, fileB);
+                        if (result.same === true) {
+                            same.push({ path: relativePath, size: fileA.size, fileA, fileB });
+                        } else if (result.same === false) {
+                            modified.push({
+                                path: relativePath,
+                                sizeA: result.sizeA || fileA.size,
+                                sizeB: result.sizeB || fileB.size,
+                                fileA,
+                                fileB,
+                                isText: isTextFile(relativePath),
+                                sizeDiff: result.sizeDiff,
+                            });
+                        } else if (result.same === null && result.tooLarge) {
+                            modified.push({
+                                path: relativePath,
+                                sizeA: fileA.size,
+                                sizeB: fileB.size,
+                                fileA,
+                                fileB,
+                                isText: false,
+                                sizeDiff: false,
+                                tooLarge: true,
+                                message: result.message,
+                            });
+                        } else {
+                            errors.push({ path: relativePath, error: result.error || '未知错误' });
+                        }
+                    }
+
+                    processed++;
+                    const pct = Math.round((processed / totalPaths) * 100);
+                    progressBar.style.width = pct + '%';
+                    progressText.textContent = `正在对比: ${processed} / ${totalPaths} (${pct}%)`;
+
+                    if (processed % 10 === 0) {
+                        await new Promise(r => setTimeout(r, 0));
+                    }
+                }
+
+                compareResults = { onlyInA, onlyInB, modified, same, errors, folderAName, folderBName };
+                updateResultsUI(compareResults);
+
+                progressBar.style.width = '100%';
+                progressText.textContent = '对比完成！';
+                btnCompare.disabled = false;
+                btnClear.style.display = 'inline-flex';
+
+                // 根据是否有差异来决定是否显示导出按钮
+                const hasDiffs = (modified.length > 0 || onlyInA.length > 0 || onlyInB.length > 0);
+                if (hasDiffs) {
+                    btnExport.style.display = 'inline-flex';
+                    btnExport.disabled = false;
+                    exportInfoBanner.classList.add('active');
+                } else {
+                    btnExport.style.display = 'none';
+                    btnExport.disabled = true;
+                    exportInfoBanner.classList.remove('active');
+                }
+
+                setTimeout(() => {
+                    progressContainer.classList.remove('active');
+                }, 1200);
+
+                if (errors.length > 0) {
+                    showToast(`对比完成，但有 ${errors.length} 个文件处理出错`);
+                } else if (modified.length === 0 && onlyInA.length === 0 && onlyInB.length === 0) {
+                    showToast('🎉 两个文件夹完全一致！');
+                } else {
+                    showToast(
+                        `对比完成：${modified.length}个不同，${onlyInB.length}个新增，${onlyInA.length}个缺失，${same.length}个相同`);
+                }
+            }
+
+            function updateResultsUI(results) {
+                const { onlyInA, onlyInB, modified, same, errors } = results;
+
+                countModified.textContent = modified.length;
+                countOnlyInB.textContent = onlyInB.length;
+                countOnlyInA.textContent = onlyInA.length;
+                countSame.textContent = same.length;
+                badgeModified.textContent = modified.length;
+                badgeOnlyB.textContent = onlyInB.length;
+                badgeOnlyA.textContent = onlyInA.length;
+                badgeSame.textContent = same.length;
+
+                resultsSummary.classList.add('active');
+                resultsDetail.classList.add('active');
+
+                renderFileList(bodyModified, modified, 'modified', 'modified-item', results);
+                renderFileList(bodyOnlyB, onlyInB, 'added', 'added-item', results);
+                renderFileList(bodyOnlyA, onlyInA, 'removed', 'removed-item', results);
+                renderFileList(bodySame, same, 'same', 'same-item', results);
+
+                document.getElementById('sectionModified').style.display = modified.length > 0 ? '' : 'none';
+                document.getElementById('sectionOnlyB').style.display = onlyInB.length > 0 ? '' : 'none';
+                document.getElementById('sectionOnlyA').style.display = onlyInA.length > 0 ? '' : 'none';
+                document.getElementById('sectionSame').style.display = same.length > 0 ? '' : 'none';
+
+                const sectionSame = document.getElementById('sectionSame');
+                if (same.length > 0) {
+                    sectionSame.classList.add('collapsed');
+                }
+                document.getElementById('sectionModified').classList.remove('collapsed');
+                document.getElementById('sectionOnlyB').classList.remove('collapsed');
+                document.getElementById('sectionOnlyA').classList.remove('collapsed');
+
+                // 显示/隐藏导出按钮
+                const hasDiffs = (modified.length > 0 || onlyInA.length > 0 || onlyInB.length > 0);
+                if (hasDiffs) {
+                    btnExport.style.display = 'inline-flex';
+                    btnExport.disabled = false;
+                    exportInfoBanner.classList.add('active');
+                } else {
+                    btnExport.style.display = 'none';
+                    btnExport.disabled = true;
+                    exportInfoBanner.classList.remove('active');
+                }
+            }
+
+            function renderFileList(container, items, type, itemClass, results) {
+                if (items.length === 0) {
+                    container.innerHTML = '<div class="empty-state">无</div>';
+                    return;
+                }
+                let html = '';
+                for (const item of items) {
+                    let sizeInfo = '';
+                    let actionBtn = '';
+                    if (type === 'modified') {
+                        if (item.tooLarge) {
+                            sizeInfo =
+                                `大小相同 (${formatFileSize(item.sizeA)}) · ⚠️${item.message || '文件过大未逐字节比较'}`;
+                        } else if (item.sizeDiff) {
+                            sizeInfo = `A: ${formatFileSize(item.sizeA)} → B: ${formatFileSize(item.sizeB)} · 大小不同`;
+                        } else {
+                            sizeInfo = `大小相同 (${formatFileSize(item.sizeA)}) · 内容不同`;
+                        }
+                        if (item.isText && !item.tooLarge && item.fileA && item.fileB) {
+                            actionBtn =
+                                `<span class="file-action" data-action="diff" data-path="${escapeHtml(item.path)}">查看差异</span>`;
+                        }
+                    } else if (type === 'added') {
+                        sizeInfo = formatFileSize(item.size);
+                    } else if (type === 'removed') {
+                        sizeInfo = formatFileSize(item.size);
+                    } else if (type === 'same') {
+                        sizeInfo = formatFileSize(item.size);
+                    }
+                    html += `
+                        <div class="file-item ${itemClass}" data-path="${escapeHtml(item.path)}" data-type="${type}">
+                            <span class="file-path" title="${escapeHtml(item.path)}">${escapeHtml(item.path)}</span>
+                            <span class="file-size">${sizeInfo}</span>
+                            ${actionBtn}
+                        </div>`;
+                }
+                container.innerHTML = html;
+
+                container.querySelectorAll('[data-action="diff"]').forEach(btn => {
+                    btn.addEventListener('click', async (e) => {
+                        e.stopPropagation();
+                        const path = btn.dataset.path;
+                        const modItem = results.modified.find(m => m.path === path);
+                        if (modItem && modItem.fileA && modItem.fileB && modItem.isText) {
+                            await openDiffModal(path, modItem.fileA, modItem.fileB);
+                        }
+                    });
+                });
+            }
+
+            // ──────────────────────────────────────
+            // 导出差异文件为ZIP
+            // ──────────────────────────────────────
+            btnExport.addEventListener('click', async () => {
+                if (isExporting) return;
+                if (!compareResults) {
+                    showToast('⚠️ 请先进行文件夹对比');
+                    return;
+                }
+                const { onlyInA, onlyInB, modified } = compareResults;
+                const totalExportFiles = onlyInA.length + onlyInB.length + modified.length * 2;
+                if (totalExportFiles === 0) {
+                    showToast('⚠️ 没有可导出的差异文件');
+                    return;
+                }
+
+                // 检查JSZip和FileSaver是否可用
+                if (typeof JSZip === 'undefined') {
+                    showToast('⚠️ JSZip库加载失败，请检查网络连接后刷新页面');
+                    return;
+                }
+                if (typeof saveAs === 'undefined') {
+                    showToast('⚠️ FileSaver库加载失败，请检查网络连接后刷新页面');
+                    return;
+                }
+
+                isExporting = true;
+                btnExport.disabled = true;
+                btnCompare.disabled = true;
+                btnClear.disabled = true;
+                progressContainer.classList.add('active');
+                progressBar.classList.add('export-mode');
+                progressBar.style.width = '0%';
+                progressText.textContent = '正在准备导出差异文件...';
+
+                const zip = new JSZip();
+                let processedCount = 0;
+                const totalTasks = totalExportFiles;
+                const skippedFiles = [];
+                let totalBytesAdded = 0;
+
+                /**
+                 * 将文件添加到zip中
+                 * @param {File} file - 要添加的文件
+                 * @param {string} zipPath - 在zip中的路径
+                 */
+                async function addFileToZip(file, zipPath) {
+                    try {
+                        const arrayBuffer = await file.arrayBuffer();
+                        zip.file(zipPath, arrayBuffer);
+                        totalBytesAdded += arrayBuffer.byteLength;
+                    } catch (err) {
+                        skippedFiles.push({ path: zipPath, error: err.message });
+                    }
+                }
+
+                // 显示进度
+                function updateExportProgress() {
+                    processedCount++;
+                    const pct = Math.min(99, Math.round((processedCount / totalTasks) * 100));
+                    progressBar.style.width = pct + '%';
+                    const sizeStr = totalBytesAdded > 0 ? ` · 已打包 ${formatFileSize(totalBytesAdded)}` : '';
+                    progressText.textContent =
+                        `正在打包: ${processedCount} / ${totalTasks} (${pct}%)${sizeStr}`;
+                }
+
+                await new Promise(r => setTimeout(r, 30));
+
+                try {
+                    // 1. 仅在A中的文件 → only_in_A/
+                    for (const item of onlyInA) {
+                        await addFileToZip(item.file, 'only_in_A/' + item.path);
+                        updateExportProgress();
+                        if (processedCount % 5 === 0) await new Promise(r => setTimeout(r, 0));
+                    }
+
+                    // 2. 仅在B中的文件 → only_in_B/
+                    for (const item of onlyInB) {
+                        await addFileToZip(item.file, 'only_in_B/' + item.path);
+                        updateExportProgress();
+                        if (processedCount % 5 === 0) await new Promise(r => setTimeout(r, 0));
+                    }
+
+                    // 3. 内容不同的文件 → modified/version_A/ 和 modified/version_B/
+                    for (const item of modified) {
+                        if (item.fileA) {
+                            await addFileToZip(item.fileA, 'modified/version_A/' + item.path);
+                        }
+                        updateExportProgress();
+                        if (processedCount % 5 === 0) await new Promise(r => setTimeout(r, 0));
+
+                        if (item.fileB) {
+                            await addFileToZip(item.fileB, 'modified/version_B/' + item.path);
+                        }
+                        updateExportProgress();
+                        if (processedCount % 5 === 0) await new Promise(r => setTimeout(r, 0));
+                    }
+
+                    progressText.textContent = `正在生成ZIP压缩包 (${formatFileSize(totalBytesAdded)})...`;
+                    progressBar.style.width = '95%';
+
+                    // 生成ZIP blob
+                    const zipBlob = await zip.generateAsync({
+                        type: 'blob',
+                        compression: 'DEFLATE',
+                        compressionOptions: { level: 6 },
+                    }, (meta) => {
+                        // JSZip的进度回调
+                        const zipPct = Math.min(99, 95 + Math.round(meta.percent / 20));
+                        progressBar.style.width = zipPct + '%';
+                        progressText.textContent =
+                            `正在压缩: ${meta.percent.toFixed(0)}% · 原始大小 ${formatFileSize(totalBytesAdded)}`;
+                    });
+
+                    progressBar.style.width = '100%';
+                    progressText.textContent =
+                        `导出完成！ZIP大小: ${formatFileSize(zipBlob.size)} · 共 ${totalTasks} 个文件`;
+
+                    // 触发下载
+                    const timestamp = getTimestamp();
+                    const zipFilename =
+                        `diff_export_${folderAName || 'A'}_vs_${folderBName || 'B'}_${timestamp}.zip`;
+                    saveAs(zipBlob, zipFilename);
+
+                    showToast(`✅ 导出成功！已下载 ${zipFilename}`);
+
+                    if (skippedFiles.length > 0) {
+                        console.warn('以下文件导出时被跳过:', skippedFiles);
+                        setTimeout(() => {
+                            showToast(`⚠️ ${skippedFiles.length} 个文件导出失败，详情请查看控制台`, 3500);
+                        }, 2500);
+                    }
+
+                } catch (err) {
+                    console.error('导出失败:', err);
+                    showToast('❌ 导出失败: ' + (err.message || '未知错误'));
+                    progressText.textContent = '导出失败，请重试';
+                } finally {
+                    isExporting = false;
+                    btnExport.disabled = false;
+                    btnCompare.disabled = !(folderAFiles && folderBFiles);
+                    btnClear.disabled = false;
+                    progressBar.classList.remove('export-mode');
+
+                    setTimeout(() => {
+                        progressContainer.classList.remove('active');
+                        progressBar.style.width = '0%';
+                    }, 2000);
+                }
+            });
+
+            // ──────────────────────────────────────
+            // Section折叠/展开
+            // ──────────────────────────────────────
+            document.querySelectorAll('.result-section-header').forEach(header => {
+                header.addEventListener('click', () => {
+                    const section = header.parentElement;
+                    section.classList.toggle('collapsed');
+                });
+            });
+
+            // ──────────────────────────────────────
+            // 清除按钮
+            // ──────────────────────────────────────
+            btnClear.addEventListener('click', () => {
+                clearResults();
+                btnClear.style.display = 'none';
+                btnExport.style.display = 'none';
+                btnExport.disabled = true;
+                exportInfoBanner.classList.remove('active');
+                btnCompare.disabled = !(folderAFiles && folderBFiles);
+                showToast('结果已清除');
+            });
+
+            // ──────────────────────────────────────
+            // 初始状态
+            // ──────────────────────────────────────
+            updateCompareButton();
+
+            // ──────────────────────────────────────
+            // 键盘快捷键
+            // ──────────────────────────────────────
+            document.addEventListener('keydown', (e) => {
+                if (e.ctrlKey && e.key === 'Enter' && !btnCompare.disabled && document.activeElement === document
+                    .body && !isExporting) {
+                    e.preventDefault();
+                    btnCompare.click();
+                }
+                // Ctrl+E 触发导出
+                if (e.ctrlKey && e.key === 'e' && !btnExport.disabled && document.activeElement === document.body &&
+                    !isExporting && compareResults) {
+                    e.preventDefault();
+                    btnExport.click();
+                }
+            });
+
+            console.log('✅ 文件夹对比工具已就绪');
+            console.log('   💡 提示：使用 Chrome/Edge/Firefox 浏览器，选择整个文件夹即可对比');
+            console.log('   ⌨️  快捷键：Ctrl+Enter 开始对比 | Ctrl+E 导出差异文件');
+            console.log('   📁 支持递归扫描子文件夹');
+            console.log('   📝 文本文件支持逐行差异查看');
+            console.log('   📦 二进制文件比较大小和内容哈希');
+            console.log('   📥 可将差异文件导出为ZIP压缩包下载');
+        })();
+    </script>
+</body>
+</html>
