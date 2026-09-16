@@ -12,12 +12,14 @@
 
 | 方式 | 地址 / 说明 |
 |---|---|
-| **在线使用**（最省事） | `https://<你的用户名>.github.io/folder-comparator/` —— 页面上半部分就是工具本体，页内还有下载按钮 |
+| **在线使用**（最省事） | <https://sannian556.github.io/folder-comparator/> —— 页面上半部分就是工具本体，页内还有下载按钮 |
 | **下载完整版** | [`docs/文件比较器.zip`](docs/文件比较器.zip)（约 83 KB），解压后双击 `文件比较器.exe` |
+| **从发布页下载** | [Releases v1.0](https://github.com/sannian556/folder-comparator/releases/tag/v1.0) —— 附件名是 `file-comparator-v1.0.zip`（GitHub 不接受中文附件名），内容与上面那个包完全一样 |
 | **自己编译** | 见下方「从源码构建」，只需要系统自带的 .NET Framework，不用装 SDK |
 
-> **第一次部署时**：仓库 → Settings → Pages → **Source 选「GitHub Actions」**（一次性设置）。
-> 工作流已经写好，推上去就会自动发布，地址就是 `https://<用户名>.github.io/<仓库名>/`。
+> **站点已经开好了**：本仓库 Settings → Pages → Source = 「GitHub Actions」，
+> 推 `docs\` 里的东西就会自动发布。如果你 fork / 复制了这个仓库，记得在自己仓库的设置里
+> 同样选一次「GitHub Actions」，Pages 会给你一个 `*.github.io` 的地址（在 Pages 设置页上能看到）。
 > 想换成自己的域名，在 Pages 里填 Custom domain，并在域名商加 DNS 即可（可选，不影响使用）。
 
 压缩包里是三个文件：
