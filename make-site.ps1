@@ -10,7 +10,7 @@
 # 用法: make-site.ps1 [-Source <原始html>] [-Out <官网html>] [-Prog <Program.cs>] [-ZipName <zip>]
 param(
     [string]$Source    = "$PSScriptRoot\web\文件比较器.html",
-    [string]$Out       = "$PSScriptRoot\build\文件比较器-官网.html",
+    [string]$Out       = "$PSScriptRoot\docs\index.html",
     [string]$Prog      = "$PSScriptRoot\src\Program.cs",
     [string]$ZipName   = "文件比较器.zip",
     [string]$AuthorUrl = "https://b23.tv/7ojZmWb"

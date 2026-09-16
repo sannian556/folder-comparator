@@ -9,7 +9,7 @@ param(
     [string]$NativeExe    = "$PSScriptRoot\build-native\文件比较器(XP-Win7版).exe",
     [string]$SiteHtml     = "$PSScriptRoot\build\文件比较器-官网.html",
     [string]$OrigHtml     = "$PSScriptRoot\web\文件比较器.html",
-    [string]$ZipPath      = "$PSScriptRoot\dist\文件比较器.zip",
+    [string]$ZipPath      = "$PSScriptRoot\docs\文件比较器.zip",
     [string]$AuthorUrl    = "https://b23.tv/7ojZmWb",
     [string]$DownloadName = "文件比较器.zip",
     [string]$SaveAsName   = "文件比较器.zip",

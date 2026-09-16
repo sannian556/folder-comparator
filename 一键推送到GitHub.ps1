@@ -81,10 +81,11 @@ if ($Token) {
 
 git remote set-url origin $RepoUrl
 Write-Host ""
-Write-Host "推完了。接下来在 GitHub 网页上做一件事（可选）：" -ForegroundColor Green
-Write-Host "  · 想让别人更好下载：Releases → Draft a new release → 把 dist\文件比较器.zip 拖进去当附件"
-Write-Host "  · 仓库里直接下也行：点开 dist\文件比较器.zip，右上角 Download"
-Write-Host "  · 本仓库不发布网页（官网/网页版不上架），只开源程序；想自己部署网页见 README 第四节"
+Write-Host "推完了。接下来在 GitHub 网页上开启网页（一次性，免费）：" -ForegroundColor Green
+Write-Host "  · Settings → Pages → Source 选「GitHub Actions」"
+Write-Host "    然后访问：https://<你的用户名>.github.io/folder-comparator/"
+Write-Host "  · 想绑自己的域名：Pages → Custom domain 填域名，再去域名商加 DNS（可选）"
+Write-Host "  · 也可在 Releases 里把 docs\文件比较器.zip 传一份当附件，方便别人下载"
 Write-Host ""
 Write-Host "提示：本机 hosts 把 github.com 指向了 127.0.0.1（Steam++ 反代），" -ForegroundColor Yellow
 Write-Host "      如果 push 报 SSL/证书错误，先关掉 Steam++ 加速，或临时注释掉 hosts 里那几行 github。" -ForegroundColor Yellow

@@ -5,7 +5,7 @@
 param(
     [string]$Exe    = "$PSScriptRoot\build-native\文件比较器(XP-Win7版).exe",
     [string]$Manual = "$PSScriptRoot\使用说明.txt",
-    [string]$Out    = "$PSScriptRoot\dist\文件比较器.zip"
+    [string]$Out    = "$PSScriptRoot\docs\文件比较器.zip"
 )
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.IO.Compression.FileSystem

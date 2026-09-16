@@ -6,7 +6,7 @@
 # 用法: verify-site.ps1 [-SiteHtml <桌面的官网html>] [-Zip <分发包>] [-Browser <msedge.exe>]
 param(
     [string]$SiteHtml = "$PSScriptRoot\build\文件比较器-官网.html",
-    [string]$ZipPath  = "$PSScriptRoot\dist\文件比较器.zip",
+    [string]$ZipPath  = "$PSScriptRoot\docs\文件比较器.zip",
     [string]$ServeDir = "$PSScriptRoot\build",
     [int]$HttpPort = 8793,
     [int]$CdpPort  = 9333,

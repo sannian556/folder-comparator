@@ -3,17 +3,22 @@
 比较两个文件夹，找出 **内容不同 / 仅在 A 中 / 仅在 B 中 / 完全相同** 的文件，能逐行查看文本差异，并把手上的差异**导出成一个 ZIP**。
 
 - **桌面版**：单文件绿色 exe，**Windows XP SP3 ~ 11 全兼容**，不需要安装、不需要联网、不写注册表启动项
-- **网页版**：源码也在本仓库里（`web/` + `src/`），可自己双击打开或编译成 exe；**本仓库不提供在线托管**
+- **在线网页版**：GitHub Pages 免费托管，打开就是工具本体（不用装任何东西）
 - **开源协议**：MIT（随便用、随便改、可商用，保留版权声明即可）
 
 ---
 
-## 一、下载
+## 一、用哪个
 
-| 方式 | 说明 |
+| 方式 | 地址 / 说明 |
 |---|---|
-| **直接下载（推荐）** | [`dist/文件比较器.zip`](dist/文件比较器.zip)（约 83 KB）—— 在 GitHub 上点开这个文件，右上角点 **Download** |
+| **在线使用**（最省事） | `https://<你的用户名>.github.io/folder-comparator/` —— 页面上半部分就是工具本体，页内还有下载按钮 |
+| **下载完整版** | [`docs/文件比较器.zip`](docs/文件比较器.zip)（约 83 KB），解压后双击 `文件比较器.exe` |
 | **自己编译** | 见下方「从源码构建」，只需要系统自带的 .NET Framework，不用装 SDK |
+
+> **第一次部署时**：仓库 → Settings → Pages → **Source 选「GitHub Actions」**（一次性设置）。
+> 工作流已经写好，推上去就会自动发布，地址就是 `https://<用户名>.github.io/<仓库名>/`。
+> 想换成自己的域名，在 Pages 里填 Custom domain，并在域名商加 DNS 即可（可选，不影响使用）。
 
 压缩包里是三个文件：
 
@@ -54,8 +59,8 @@
 
 | 版本 | 需要什么 |
 |---|---|
-| `dist/文件比较器.zip` 里的 exe | **Windows XP SP3 及以上**。XP 需要系统已启用 .NET Framework 3.5；Win7/8/10/11 一般都自带 |
-| 网页版（自己构建） | 任意现代浏览器；编译成 exe 需要 WebView2 运行时（Win11 自带，Win10 多数随 Edge 已有） |
+| `docs/文件比较器.zip` 里的 exe | **Windows XP SP3 及以上**。XP 需要系统已启用 .NET Framework 3.5；Win7/8/10/11 一般都自带 |
+| 在线网页版 | 任意现代浏览器（Chrome / Edge / Firefox / 手机浏览器都行） |
 
 如果提示缺少 .NET Framework：控制面板 → 程序和功能 → 启用或关闭 Windows 功能 →
 勾选「.NET Framework 3.5（包括 .NET 2.0 和 3.0）」→ 确定。
@@ -70,8 +75,11 @@
 # 原生版（XP ~ 11 通用）：产出 build-native\文件比较器(XP-Win7版).exe 与 (Win8-11版).exe
 powershell -ExecutionPolicy Bypass -File .\build-native.ps1
 
-# 打包分发用的压缩包（exe + 请先读我.txt + 使用说明.txt）→ dist\文件比较器.zip
+# 打包分发用的压缩包（exe + 请先读我.txt + 使用说明.txt）→ docs\文件比较器.zip
 powershell -ExecutionPolicy Bypass -File .\make-package.ps1
+
+# 生成官网页面（把注入脚本内联进页面 + 页内下载按钮）→ docs\index.html
+powershell -ExecutionPolicy Bypass -File .\make-site.ps1
 ```
 
 - 编译用的是**系统自带的 csc.exe**（.NET Framework 自带），不需要装 SDK、不需要 NuGet：
@@ -80,14 +88,10 @@ powershell -ExecutionPolicy Bypass -File .\make-package.ps1
 - 源码刻意只用 C# 2.0 语法（没有 LINQ / `var` / 自动属性），所以同一份 `native\*.cs`
   能被两代编译器分别编出两个目标。
 
-网页版与官网页面（**可选**：本仓库不发布网页，只是把工具留着）：
+网页版 exe（可选：把网页版装进 WebView2 宿主，需要先还原 WebView2 SDK）：
 
 ```powershell
-# 网页版 exe：需要先还原 WebView2 SDK（dotnet add package Microsoft.Web.WebView2）
 powershell -ExecutionPolicy Bypass -File .\build.ps1 -SourceHtml .\web\文件比较器.html
-
-# 生成带下载卡的“官网页面” → build\文件比较器-官网.html（自己拿去部署）
-powershell -ExecutionPolicy Bypass -File .\make-site.ps1
 ```
 
 ---
@@ -98,14 +102,15 @@ powershell -ExecutionPolicy Bypass -File .\make-site.ps1
 native\              原生版源码（WinForms，XP ~ 11）
 src\Program.cs       网页版宿主 + 注入脚本（UiScript）
 web\文件比较器.html   网页版工具本体（原页面，单文件、离线可用）
-dist\文件比较器.zip   发布用的压缩包（下载入口）
+docs\                GitHub Pages 站点：index.html（官网页面）+ 文件比较器.zip（下载件）
+.github\workflows\   推送后自动发布 Pages 的工作流
 assets\              图标与两个前端库（离线内置，页面不依赖 CDN 也能用）
 tests\               忽略规则引擎的单元测试
 testdata\            验收用的两个文件夹夹具
 build-native.ps1     构建原生版两个目标
 build.ps1            构建网页版 exe
 make-package.ps1     打分发压缩包
-make-site.ps1        生成官网页面（本地用，不发布）
+make-site.ps1        生成官网页面
 verify-*.ps1         自动化验收脚本（真窗口 / 真浏览器，共 200+ 项断言）
 shot-dpi.ps1         高 DPI 截图辅助
 使用说明.txt          给用户的完整说明
@@ -128,9 +133,10 @@ README-dev.md        开发向的英文说明（构建与验收细节）
 网页版受浏览器限制：拿不到文件夹绝对路径、不能重读磁盘（历史记录因此是只读快照）、
 超过 50 MB 的文件只比大小、中文只按 UTF-8 解码。要完整功能请用桌面版。
 
-**Q：有在线版吗？**
-没有，作者只开源程序本身，不做在线托管。想用网页版，把 `web\文件比较器.html` 双击打开即可
-（单文件、离线可用）；也可以跑 `make-site.ps1` 生成带下载卡的官网页面，自己部署到任何静态托管。
+**Q：在线的网页访问不了 / 很慢？**
+`github.io` 在国内网络下时通时断，属于网络环境问题，不是站点坏了。想稳定的话两个办法：
+① 把 `web\文件比较器.html` 下载到本地双击打开（单文件、完全离线可用）；
+② 给 Pages 绑一个自己的域名（Pages → Custom domain + 域名商加 DNS），必要时再套一层 CDN。
 
 ---
 
