@@ -1,6 +1,6 @@
 ﻿# Folder Compare Tool - build project
 
-Turns the single-file web page `D:\桌面\文件比较器.html` ("folder comparator")
+Turns the single-file web page `web\文件比较器.html` ("folder comparator")
 into standalone Windows executables. Two independent approaches live here;
 **the native one is the current deliverable** because it is the only one that
 can run on Windows XP.
@@ -206,7 +206,7 @@ run on a Windows 7 that lacks a compatible runtime build.
 Kept for reference; rebuild with:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File build.ps1 -SourceHtml "D:\桌面\文件比较器.html"
+powershell -ExecutionPolicy Bypass -File build.ps1 -SourceHtml "web\文件比较器.html"
 ```
 
 Verification scripts for this variant: `verify.ps1` (CDP probe of the live page)
