@@ -1,56 +1,56 @@
-ï»¿# ä¸€é”®æŠŠæœ¬ä»“åº“æ¨åˆ° GitHubï¼ˆéœ€è¦ä½ è‡ªå·±æœ‰ä¸€ä¸ª GitHub è´¦å·ï¼‰
+# Ò»¼ü°Ñ±¾²Ö¿âÍÆµ½ GitHub£¨ĞèÒªÄã×Ô¼ºÓĞÒ»¸ö GitHub ÕËºÅ£©
 #
-# ç”¨æ³•ï¼š
-#   powershell -ExecutionPolicy Bypass -File .\ä¸€é”®æ¨é€åˆ°GitHub.ps1
-#   æˆ–ç›´æ¥ç»™å‚æ•°ï¼š
-#   powershell -ExecutionPolicy Bypass -File .\ä¸€é”®æ¨é€åˆ°GitHub.ps1 -RepoUrl https://github.com/ä½ çš„ç”¨æˆ·å/ä»“åº“å.git
+# ÓÃ·¨£º
+#   powershell -ExecutionPolicy Bypass -File .\Ò»¼üÍÆËÍµ½GitHub.ps1
+#   »òÖ±½Ó¸ø²ÎÊı£º
+#   powershell -ExecutionPolicy Bypass -File .\Ò»¼üÍÆËÍµ½GitHub.ps1 -RepoUrl https://github.com/ÄãµÄÓÃ»§Ãû/²Ö¿âÃû.git
 #
-# è¯´æ˜ï¼š
-#   Â· ä»“åº“è¦å…ˆåœ¨ GitHub ç½‘é¡µä¸Šå»ºå¥½ï¼ˆç©ºä»“åº“ï¼Œä¸è¦å‹¾ READMEï¼‰ï¼Œæˆ–è€…ç”¨ -Create è®©è„šæœ¬è°ƒç”¨ API å¸®ä½ å»º
-#   Â· æ¨é€æ—¶ GitHub ä¸å†æ¥å—å¯†ç ï¼Œè¦ç”¨ Personal Access Tokenï¼ˆPATï¼‰ï¼š
-#       GitHub â†’ Settings â†’ Developer settings â†’ Personal access tokens â†’ Fine-grained tokens
-#       æƒé™ç»™ Contents: Read and writeï¼ˆPrivate repositories è¿˜è¦ç»™ Metadata: Readï¼‰
-#   Â· token ä¸ä¼šå†™è¿› .git/configï¼šåªåœ¨è¿™ä¸€æ¬¡ push çš„ URL é‡Œä¸´æ—¶ç”¨ä¸€ä¸‹ï¼Œæ¨å®Œä¼šæŠŠ remote è¿˜åŸæˆä¸å¸¦ token çš„åœ°å€
+# ËµÃ÷£º
+#   ¡¤ ²Ö¿âÒªÏÈÔÚ GitHub ÍøÒ³ÉÏ½¨ºÃ£¨¿Õ²Ö¿â£¬²»Òª¹´ README£©£¬»òÕßÓÃ -Create ÈÃ½Å±¾µ÷ÓÃ API °ïÄã½¨
+#   ¡¤ ÍÆËÍÊ± GitHub ²»ÔÙ½ÓÊÜÃÜÂë£¬ÒªÓÃ Personal Access Token£¨PAT£©£º
+#       GitHub ¡ú Settings ¡ú Developer settings ¡ú Personal access tokens ¡ú Fine-grained tokens
+#       È¨ÏŞ¸ø Contents: Read and write£¨Private repositories »¹Òª¸ø Metadata: Read£©
+#   ¡¤ token ²»»áĞ´½ø .git/config£ºÖ»ÔÚÕâÒ»´Î push µÄ URL ÀïÁÙÊ±ÓÃÒ»ÏÂ£¬ÍÆÍê»á°Ñ remote »¹Ô­³É²»´ø token µÄµØÖ·
 
 param(
     [string]$RepoUrl,
     [string]$Token,
-    [string]$UserName = "ä¸‰å¹´å‰çš„æˆ‘",
+    [string]$UserName = "ÈıÄêÇ°µÄÎÒ",
     [string]$UserEmail = "WjianBiao@users.noreply.github.com"
 )
 $ErrorActionPreference = 'Stop'
 $here = $PSScriptRoot
 Set-Location $here
 
-# â”€â”€ 1) æœ¬ä»“åº“çš„ git èº«ä»½ï¼ˆåªå†™æœ¬åœ°ï¼Œä¸åŠ¨ä½ çš„å…¨å±€é…ç½®ï¼‰â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ©¤©¤ 1) ±¾²Ö¿âµÄ git Éí·İ£¨Ö»Ğ´±¾µØ£¬²»¶¯ÄãµÄÈ«¾ÖÅäÖÃ£©©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤
 if (-not (Test-Path (Join-Path $here '.git'))) {
     git init | Out-Null
-    "å·²åˆå§‹åŒ– git ä»“åº“: $here"
+    "ÒÑ³õÊ¼»¯ git ²Ö¿â: $here"
 }
 git symbolic-ref HEAD refs/heads/main 2>$null
 git config user.name  $UserName
 git config user.email $UserEmail
 
-# â”€â”€ 2) æäº¤ â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ©¤©¤ 2) Ìá½» ©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤
 git add -A
 $pending = (git status --porcelain | Measure-Object).Count
 if ($pending -gt 0) {
-    git commit -m "æ–‡ä»¶æ¯”è¾ƒå™¨ï¼šé¦–ä¸ªå…¬å¼€ç‰ˆæœ¬ï¼ˆåŸç”Ÿç‰ˆæºç  + ç½‘é¡µç‰ˆ + å®˜ç½‘é¡µé¢ï¼ŒMIT å¼€æºï¼‰" | Out-Null
-    "å·²æäº¤ $pending ä¸ªæ”¹åŠ¨"
+    git commit -m "ÎÄ¼ş±È½ÏÆ÷£ºÊ×¸ö¹«¿ª°æ±¾£¨Ô­Éú°æÔ´Âë + ÍøÒ³°æ + ¹ÙÍøÒ³Ãæ£¬MIT ¿ªÔ´£©" | Out-Null
+    "ÒÑÌá½» $pending ¸ö¸Ä¶¯"
 } else {
-    "æ²¡æœ‰éœ€è¦æäº¤çš„æ”¹åŠ¨"
+    "Ã»ÓĞĞèÒªÌá½»µÄ¸Ä¶¯"
 }
-"å½“å‰æäº¤ï¼š" + (git log -1 --pretty=format:'%h %s')
+"µ±Ç°Ìá½»£º" + (git log -1 --pretty=format:'%h %s')
 
-# â”€â”€ 3) è¦ä»“åº“åœ°å€ â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ©¤©¤ 3) Òª²Ö¿âµØÖ· ©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤
 if (-not $RepoUrl) {
     Write-Host ""
-    Write-Host "è¯·ç²˜è´´ä½ çš„ GitHub ä»“åº“åœ°å€ï¼ˆå½¢å¦‚ https://github.com/ä½ çš„ç”¨æˆ·å/folder-comparator.gitï¼‰ï¼š" -ForegroundColor Cyan
+    Write-Host "ÇëÕ³ÌùÄãµÄ GitHub ²Ö¿âµØÖ·£¨ĞÎÈç https://github.com/ÄãµÄÓÃ»§Ãû/folder-comparator.git£©£º" -ForegroundColor Cyan
     $RepoUrl = Read-Host
 }
 $RepoUrl = $RepoUrl.Trim()
 if ($RepoUrl -notmatch '^https://github\.com/.+/.+?(\.git)?$') {
-    throw "åœ°å€çœ‹èµ·æ¥ä¸å¯¹ï¼š$RepoUrlï¼ˆæœ¬è„šæœ¬åªæ”¯æŒ https å½¢å¼ï¼‰"
+    throw "µØÖ·¿´ÆğÀ´²»¶Ô£º$RepoUrl£¨±¾½Å±¾Ö»Ö§³Ö https ĞÎÊ½£©"
 }
 if ($RepoUrl -notmatch '\.git$') { $RepoUrl += '.git' }
 
@@ -58,10 +58,10 @@ git remote remove origin 2>$null
 git remote add origin $RepoUrl
 "remote origin = $RepoUrl"
 
-# â”€â”€ 4) æ¨é€ï¼ˆtoken åªåœ¨è¿™ä¸€æ¬¡çš„ URL é‡Œç”¨ï¼‰â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ©¤©¤ 4) ÍÆËÍ£¨token Ö»ÔÚÕâÒ»´ÎµÄ URL ÀïÓÃ£©©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤
 if (-not $Token) {
     Write-Host ""
-    Write-Host "è¯·ç²˜è´´ä½ çš„ Personal Access Tokenï¼ˆè¾“å…¥æ—¶ä¸æ˜¾ç¤ºï¼›ç›´æ¥å›è½¦åˆ™ç”¨ç³»ç»Ÿå‡­æ®ç®¡ç†å™¨å¼¹çª—ï¼‰ï¼š" -ForegroundColor Cyan
+    Write-Host "ÇëÕ³ÌùÄãµÄ Personal Access Token£¨ÊäÈëÊ±²»ÏÔÊ¾£»Ö±½Ó»Ø³µÔòÓÃÏµÍ³Æ¾¾İ¹ÜÀíÆ÷µ¯´°£©£º" -ForegroundColor Cyan
     $sec = Read-Host -AsSecureString
     $Token = [System.Net.NetworkCredential]::new('', $sec).Password
 }
@@ -70,22 +70,22 @@ if ($Token) {
     $withToken = $RepoUrl -replace '^https://', ("https://x-access-token:" + $Token + "@")
     try {
         git push $withToken main:main
-        "æ¨é€æˆåŠŸ âœ“"
+        "ÍÆËÍ³É¹¦ ?"
     } finally {
-        git remote set-url origin $RepoUrl      # ç«‹åˆ»æŠŠ token ä»é…ç½®é‡ŒæŠ¹æ‰
+        git remote set-url origin $RepoUrl      # Á¢¿Ì°Ñ token ´ÓÅäÖÃÀïÄ¨µô
     }
 } else {
     git push -u origin main
-    "æ¨é€æˆåŠŸ âœ“ï¼ˆèµ°ç³»ç»Ÿå‡­æ®ç®¡ç†å™¨ï¼‰"
+    "ÍÆËÍ³É¹¦ ?£¨×ßÏµÍ³Æ¾¾İ¹ÜÀíÆ÷£©"
 }
 
 git remote set-url origin $RepoUrl
 Write-Host ""
-Write-Host "æ¨å®Œäº†ã€‚æ¥ä¸‹æ¥åœ¨ GitHub ç½‘é¡µä¸Šå¼€å¯ç½‘é¡µï¼ˆä¸€æ¬¡æ€§ï¼Œå…è´¹ï¼‰ï¼š" -ForegroundColor Green
-Write-Host "  Â· Settings â†’ Pages â†’ Source é€‰ã€ŒGitHub Actionsã€"
-Write-Host "    ç„¶åè®¿é—®ï¼šhttps://<ä½ çš„ç”¨æˆ·å>.github.io/folder-comparator/"
-Write-Host "  Â· æƒ³ç»‘è‡ªå·±çš„åŸŸåï¼šPages â†’ Custom domain å¡«åŸŸåï¼Œå†å»åŸŸåå•†åŠ  DNSï¼ˆå¯é€‰ï¼‰"
-Write-Host "  Â· ä¹Ÿå¯åœ¨ Releases é‡ŒæŠŠ docs\æ–‡ä»¶æ¯”è¾ƒå™¨.zip ä¼ ä¸€ä»½å½“é™„ä»¶ï¼Œæ–¹ä¾¿åˆ«äººä¸‹è½½"
+Write-Host "ÍÆÍêÁË¡£½ÓÏÂÀ´ÔÚ GitHub ÍøÒ³ÉÏ¿ªÆôÍøÒ³£¨Ò»´ÎĞÔ£¬Ãâ·Ñ£©£º" -ForegroundColor Green
+Write-Host "  ¡¤ Settings ¡ú Pages ¡ú Source Ñ¡¡¸GitHub Actions¡¹"
+Write-Host "    È»ºó·ÃÎÊ£ºhttps://<ÄãµÄÓÃ»§Ãû>.github.io/folder-comparator/"
+Write-Host "  ¡¤ Ïë°ó×Ô¼ºµÄÓòÃû£ºPages ¡ú Custom domain ÌîÓòÃû£¬ÔÙÈ¥ÓòÃûÉÌ¼Ó DNS£¨¿ÉÑ¡£©"
+Write-Host "  ¡¤ Ò²¿ÉÔÚ Releases Àï°Ñ docs\ÎÄ¼ş±È½ÏÆ÷.zip ´«Ò»·İµ±¸½¼ş£¬·½±ã±ğÈËÏÂÔØ"
 Write-Host ""
-Write-Host "æç¤ºï¼šæœ¬æœº hosts æŠŠ github.com æŒ‡å‘äº† 127.0.0.1ï¼ˆSteam++ åä»£ï¼‰ï¼Œ" -ForegroundColor Yellow
-Write-Host "      å¦‚æœ push æŠ¥ SSL/è¯ä¹¦é”™è¯¯ï¼Œå…ˆå…³æ‰ Steam++ åŠ é€Ÿï¼Œæˆ–ä¸´æ—¶æ³¨é‡Šæ‰ hosts é‡Œé‚£å‡ è¡Œ githubã€‚" -ForegroundColor Yellow
+Write-Host "ÌáÊ¾£º±¾»ú hosts °Ñ github.com Ö¸ÏòÁË 127.0.0.1£¨Steam++ ·´´ú£©£¬" -ForegroundColor Yellow
+Write-Host "      Èç¹û push ±¨ SSL/Ö¤Êé´íÎó£¬ÏÈ¹Øµô Steam++ ¼ÓËÙ£¬»òÁÙÊ±×¢ÊÍµô hosts ÀïÄÇ¼¸ĞĞ github¡£" -ForegroundColor Yellow
