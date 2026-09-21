@@ -155,6 +155,8 @@ namespace FileDiffTool
 
             this.KeyPreview = true;
             this.KeyDown += OnKeyDown;
+
+            Theme.Apply(this);   // 差异窗体的表格/状态栏也要跟着主题走
         }
 
         private static Font PickMonoFont()

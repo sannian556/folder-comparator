@@ -15,6 +15,20 @@ namespace FileDiffTool
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
 
+            // 界面线程里的异常默认会被 WinForms 吞掉（或弹个看不懂的框），一律写进 crash.log：
+            // 弹窗/事件处理器里出的问题，靠这个才查得动
+            Application.ThreadException += delegate(object sender, System.Threading.ThreadExceptionEventArgs ev)
+            {
+                try
+                {
+                    File.WriteAllText(Path.Combine(Application.StartupPath, "crash.log"),
+                        DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + "\r\n" + ev.Exception.ToString());
+                }
+                catch (Exception) { }
+                MessageBox.Show("界面出错：\r\n\r\n" + ev.Exception.Message, "文件比较器",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+            };
+
             // 双实例保护：同一时间只跑一个主窗口
             bool createdNew;
             System.Threading.Mutex mutex = new System.Threading.Mutex(true,

@@ -1,4 +1,4 @@
-﻿// 历史记录面板（原生版）：列出「导出成功」的快照，可还原、可按差异重新对比、可清理。
+// 历史记录面板（原生版）：列出「导出成功」的快照，可还原、可按差异重新对比、可清理。
 // 与主窗口一致：AutoScaleMode.None + 手动按 DPI 缩放（自动缩放对本程序无效）。
 using System;
 using System.Collections.Generic;
@@ -126,6 +126,8 @@ namespace FileDiffTool
 
             Load += OnLoaded;
             Fill();
+
+            Theme.Apply(this);   // 跟主界面同一套换肤（含里面的 DataGridView）
         }
 
         // ── DPI ─────────────────────────────────────────────

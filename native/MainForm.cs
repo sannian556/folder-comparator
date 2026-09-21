@@ -56,7 +56,9 @@ namespace FileDiffTool
         private bool _silentMode;
         private string _dumpUiPath;   // --dump-ui <文件>：把控件树（含实际字体）写出来，便于排查布局问题
         private string _dumpHistoryPath;   // --dump-history <文件>：把历史记录解析结果写出来（自动化验收用）
+        private string _dumpThemePath;     // --dump-theme <文件>：把主题状态写出来（自动化断言用）
         private int _autoRestoreIndex = -1; // --restore-history <序号>：还原第 N 条历史（配合导出路径可无人值守重打包）
+        private bool _autoOpenSettings;     // --settings：启动直接把设置窗体打开（自动化截图/验证用）
 
         public MainForm(string[] args)
         {
@@ -64,6 +66,10 @@ namespace FileDiffTool
             Text = "文件比较器 — 文件夹对比工具";
             StartPosition = FormStartPosition.CenterScreen;
             _uiScale = DetectUiScale();
+            // 主题：自绘控件要跟界面用同一个缩放系数；命令行指定了外观就不再读设置文件
+            Theme.UiScale = _uiScale;
+            if (!Theme.HasStartupOverride) Theme.Load();
+            Theme.Refresh();
             _rules = IgnoreRules.Load();   // 上次用过的忽略规则（%APPDATA%\文件比较器\设置.txt）
             // 先设模式、后设基准 —— 反过来会被 AutoScaleMode 的 setter 重置成"当前 DPI"，
             // 那样 AutoScaleFactor = 1.0（控件完全不缩放），而 125%/150% 下字体像素却变大了，
@@ -80,6 +86,7 @@ namespace FileDiffTool
 
             BuildLayout();
             ApplyUiScale(this);   // 建好控件后统一按 DPI 放大
+            Theme.Apply(this);    // 再统一换肤（深色染深、浅色保持原样）
             UpdateButtons();
 
             // 支持 文件比较器.exe "文件夹A" "文件夹B"，也支持把两个文件夹拖到 exe 或窗口上
@@ -122,7 +129,24 @@ namespace FileDiffTool
                     else if (string.Equals(args[i], "--export", StringComparison.OrdinalIgnoreCase) &&
                              i + 1 < args.Length)
                         _autoExportPath = args[i + 1];
+                    // 下面三个是主题相关的自动化口子（正常双击用不到）
+                    else if (string.Equals(args[i], "--theme", StringComparison.OrdinalIgnoreCase) &&
+                             i + 1 < args.Length)
+                        ApplyStartupTheme(args[i + 1]);          // auto / light / dark
+                    else if (string.Equals(args[i], "--no-sys-theme", StringComparison.OrdinalIgnoreCase))
+                        Theme.ForceNoSystemSupport = true;       // 假装系统不支持深色，用来看灰态
+                    else if (string.Equals(args[i], "--dump-theme", StringComparison.OrdinalIgnoreCase) &&
+                             i + 1 < args.Length)
+                        _dumpThemePath = args[i + 1];            // 把主题状态写出来
+                    else if (string.Equals(args[i], "--settings", StringComparison.OrdinalIgnoreCase))
+                        _autoOpenSettings = true;                // 启动就打开设置窗体（自动化截图用）
                 }
+            }
+            // 上面改过主题设置的话要重算一次并重新刷界面（构造开头那会儿还没解析参数）
+            if (Theme.HasStartupOverride || Theme.ForceNoSystemSupport)
+            {
+                Theme.Refresh();
+                Theme.Apply(this);
             }
             AllowDrop = true;
             DragEnter += OnDragEnter;
@@ -131,6 +155,17 @@ namespace FileDiffTool
             // 与原网页一致的快捷键：Ctrl+Enter 开始对比，Ctrl+E 导出
             KeyPreview = true;
             KeyDown += OnMainKeyDown;
+
+            // 自动化：把主题状态写出来就退出（放最后，顺便验证上面那通换肤没把构造搞崩）
+            if (_dumpThemePath != null)
+            {
+                DumpThemeState(_dumpThemePath);
+                Environment.Exit(0);
+            }
+
+            // 自动化：启动就把设置窗体弹出来（要等窗口显示后再弹，模态窗体才有正确的父窗口位置）
+            if (_autoOpenSettings)
+                Shown += delegate { OnOpenSettings(this, EventArgs.Empty); };
         }
 
         private void OnMainKeyDown(object sender, KeyEventArgs e)
@@ -196,9 +231,24 @@ namespace FileDiffTool
         protected override void OnShown(EventArgs e)
         {
             base.OnShown(e);
+            // 窗口真显示出来之后再刷一次主题：构造阶段控件还没句柄，有些样式（按钮的 FlatStyle 之类）
+            // 改了要等建句柄时才真正生效，不补这一下会留下一批系统配色的白底控件
+            Theme.Apply(this);
             if (_dumpUiPath != null)
             {
                 DumpUiTo(_dumpUiPath);
+                // 附一行主题状态：dump 出来的颜色必须能对上"当时到底是浅色还是深色"，
+                // 不然很容易拿着浅色的 dump 去解释深色的截图（已经白排查过一次）
+                try
+                {
+                    File.AppendAllText(_dumpUiPath, "--- theme=" + Theme.Describe(Theme.Current)
+                        + " effective=" + (Theme.IsLight ? "light" : "dark")
+                        + " bg=" + HexOf(Theme.Bg) + " panel=" + HexOf(Theme.Panel)
+                        + " btnFace=" + HexOf(Theme.BtnFace)
+                        + " visited=" + Theme.LastVisited + " changed=" + Theme.LastChanged + "\r\n",
+                        new UTF8Encoding(false));
+                }
+                catch (Exception) { }
                 Close();
                 return;
             }
@@ -270,6 +320,44 @@ namespace FileDiffTool
             System.IO.File.WriteAllText(path, sb.ToString(), System.Text.Encoding.UTF8);
         }
 
+        /// <summary>颜色写成十六进制；全透明单独标出来（Color.Transparent 的 R/G/B 也是 FF/FF/FF，
+        /// 只取 RGB 会显示成"白色"，曾据此误判"深色下这片还是白底"）</summary>
+        private static string HexOf(Color c)
+        {
+            if (c.A == 0) return "透明";
+            return c.R.ToString("X2") + c.G.ToString("X2") + c.B.ToString("X2");
+        }
+
+        /// <summary>命令行 --theme：指定启动外观，不再读设置文件</summary>
+        private static void ApplyStartupTheme(string name)
+        {
+            Theme.HasStartupOverride = true;
+            Theme.Mode m = Theme.Mode.Auto;
+            if (string.Equals(name, "light", StringComparison.OrdinalIgnoreCase))
+                m = Theme.Mode.Light;
+            else if (string.Equals(name, "dark", StringComparison.OrdinalIgnoreCase))
+                m = Theme.Mode.Dark;
+            // Current 和 StartupOverride 都设上：解析实际明暗和界面读的可能不是同一个字段
+            Theme.StartupOverride = m;
+            Theme.Current = m;
+        }
+
+        /// <summary>命令行 --dump-theme：把主题状态写出来（自动化断言用）</summary>
+        private static void DumpThemeState(string path)
+        {
+            StringBuilder sb = new StringBuilder();
+            sb.AppendLine("mode=" + Theme.Describe(Theme.Current));
+            sb.AppendLine("effective=" + (Theme.IsLight ? "light" : "dark"));
+            sb.AppendLine("sysSupport=" + (Theme.SystemSupportsTheme ? "yes" : "no"));
+            sb.AppendLine("sysPrefersLight=" + (Theme.ReadSystemPrefersLight() ? "yes" : "no"));
+            sb.AppendLine("autoEnabled=" + (Theme.SystemSupportsTheme ? "yes" : "no"));
+            sb.AppendLine("bg=" + HexOf(Theme.Bg));
+            sb.AppendLine("panel=" + HexOf(Theme.Panel));
+            sb.AppendLine("text=" + HexOf(Theme.Text));
+            sb.AppendLine("settings=" + Theme.SettingsPath);
+            File.WriteAllText(path, sb.ToString(), Encoding.UTF8);
+        }
+
         private void DumpUi(Control c, System.Text.StringBuilder sb, int depth)
         {
             sb.Append(new string(' ', depth * 2));
@@ -280,6 +368,10 @@ namespace FileDiffTool
             sb.Append("  font=").Append(f.Name).Append(' ').Append(f.SizeInPoints.ToString("0.##"))
               .Append("pt h=").Append(f.Height);
             sb.Append("  client=").Append(c.ClientSize.Width).Append('x').Append(c.ClientSize.Height);
+            sb.Append("  back=").Append(HexOf(c.BackColor)).Append(" fore=").Append(HexOf(c.ForeColor));
+            if (c is ListView) sb.Append(" ownerDraw=").Append(((ListView)c).OwnerDraw);
+            if (c is Button) sb.Append(" flat=").Append(((Button)c).FlatStyle);
+            if (!c.Enabled) sb.Append(" DISABLED");
             Label lb = c as Label;
             if (lb != null) sb.Append("  autosize=").Append(lb.AutoSize)
                              .Append(" ellipsis=").Append(lb.AutoEllipsis)
@@ -414,7 +506,27 @@ namespace FileDiffTool
             ToolTip tip = new ToolTip();
             tip.SetToolTip(b, "用浏览器打开作者的 B 站主页");
 
+            // 「设置」（外观三档等）：跟「联系作者」并排，一起贴着右下角。
+            // FlowDirection 是 RightToLeft，后加的会排在更左边。
+            Button st = new Button();
+            st.Text = "设置";
+            st.Size = new Size(96, 28);
+            st.Cursor = Cursors.Hand;
+            st.Click += OnOpenSettings;
+            f.Controls.Add(st);
+            tip.SetToolTip(st, "外观（跟随系统 / 浅色 / 深色）");
+
             return f;
+        }
+
+        private void OnOpenSettings(object sender, EventArgs e)
+        {
+            using (SettingsForm dlg = new SettingsForm(this))
+            {
+                dlg.ShowDialog(this);
+            }
+            Theme.Apply(this);     // 设置里可能改过外观，回来再刷一遍
+            UpdateButtons();
         }
 
         private void OnContactAuthor(object sender, EventArgs e)
@@ -435,14 +547,14 @@ namespace FileDiffTool
             Label title = new Label();
             title.Text = "文件夹对比工具";
             title.Font = TextUtil.PickUiFont(15f, true);
-            title.ForeColor = Color.FromArgb(38, 50, 66);
+            title.ForeColor = Theme.Mix(Color.FromArgb(38, 50, 66));
             title.AutoSize = true;
             title.Location = new Point(2, 2);
             p.Controls.Add(title);
 
             Label sub = new Label();
             sub.Text = "选择两个文件夹，快速找出文件差异 · 支持文本内容逐行对比 · 可导出差异文件为 ZIP";
-            sub.ForeColor = Color.FromArgb(110, 120, 132);
+            sub.ForeColor = Theme.Mix(Color.FromArgb(110, 120, 132));
             sub.AutoSize = true;
             sub.Location = new Point(4, 34);
             p.Controls.Add(sub);
@@ -475,7 +587,7 @@ namespace FileDiffTool
 
             Label path = new Label();
             path.Text = "尚未选择文件夹";
-            path.ForeColor = Color.Gray;
+            path.ForeColor = Theme.Mix(Color.Gray);
             path.AutoEllipsis = true;
             path.Location = new Point(12, 26);
             path.Size = new Size(420, 18);
@@ -484,7 +596,7 @@ namespace FileDiffTool
 
             Label info = new Label();
             info.Text = "";
-            info.ForeColor = Color.FromArgb(74, 108, 247);
+            info.ForeColor = Theme.Mix(Color.FromArgb(74, 108, 247));
             info.AutoEllipsis = true;
             info.Location = new Point(12, 46);
             info.Size = new Size(420, 18);
@@ -510,7 +622,7 @@ namespace FileDiffTool
             // （也用于绕开"浏览文件夹"对话框无法选中 .lnk 快捷方式的限制）
             Label hint = new Label();
             hint.Text = "文件拖拽或路径粘贴";
-            hint.ForeColor = Color.FromArgb(120, 130, 142);
+            hint.ForeColor = Theme.Mix(Color.FromArgb(120, 130, 142));
             hint.Location = new Point(12, 104);
             hint.Size = new Size(180, 16);
             hint.Anchor = AnchorStyles.Top | AnchorStyles.Left;
@@ -588,7 +700,7 @@ namespace FileDiffTool
             _chkTop.AutoSize = false;
             _chkTop.Size = new Size(100, 24);
             _chkTop.Location = new Point(476, 12);
-            _chkTop.ForeColor = Color.FromArgb(70, 80, 92);
+            _chkTop.ForeColor = Theme.Mix(Color.FromArgb(70, 80, 92));
             _chkTop.CheckedChanged += OnToggleTopMost;
             p.Controls.Add(_chkTop);
 
@@ -692,9 +804,9 @@ namespace FileDiffTool
             _dirB = h.DirB;
 
             _lblPathA.Text = h.DirA + (hasA ? "" : "（已被删除或已被移除）");
-            _lblPathA.ForeColor = hasA ? Color.FromArgb(38, 50, 66) : Color.FromArgb(190, 60, 60);
+            _lblPathA.ForeColor = hasA ? Theme.Mix(Color.FromArgb(38, 50, 66)) : Theme.Mix(Color.FromArgb(190, 60, 60));
             _lblPathB.Text = h.DirB + (hasB ? "" : "（已被删除或已被移除）");
-            _lblPathB.ForeColor = hasB ? Color.FromArgb(38, 50, 66) : Color.FromArgb(190, 60, 60);
+            _lblPathB.ForeColor = hasB ? Theme.Mix(Color.FromArgb(38, 50, 66)) : Theme.Mix(Color.FromArgb(190, 60, 60));
 
             string infoA = h.CountModified + h.CountOnlyA + h.CountOnlyB + h.CountSame + " 个文件（历史快照）";
             _lblInfoA.Text = infoA;
@@ -737,7 +849,7 @@ namespace FileDiffTool
             if (_btnIgnore == null) return;
             int n = _rules == null ? 0 : _rules.RuleCount;
             _btnIgnore.Text = n == 0 ? "忽略规则…" : ("忽略规则 (" + n + ")");
-            _btnIgnore.ForeColor = n == 0 ? Color.FromArgb(70, 80, 92) : Color.FromArgb(190, 60, 60);
+            _btnIgnore.ForeColor = n == 0 ? Theme.Mix(Color.FromArgb(70, 80, 92)) : Theme.Mix(Color.FromArgb(190, 60, 60));
         }
 
         /// <summary>打开忽略规则设置；规则变了就把已载入的文件夹按新规则重扫一遍。</summary>
@@ -806,7 +918,7 @@ namespace FileDiffTool
 
             _lblStatus = new Label();
             _lblStatus.Text = "请选择两个文件夹后开始对比（Ctrl+Enter 开始，也可直接把文件夹拖进来）";
-            _lblStatus.ForeColor = Color.FromArgb(110, 120, 132);
+            _lblStatus.ForeColor = Theme.Mix(Color.FromArgb(110, 120, 132));
             _lblStatus.AutoEllipsis = true;
             _lblStatus.Location = new Point(2, 26);
             _lblStatus.Size = new Size(560, 22);
@@ -853,7 +965,7 @@ namespace FileDiffTool
 
                 Label cap = new Label();
                 cap.Text = names[i];
-                cap.ForeColor = Color.FromArgb(100, 110, 122);
+                cap.ForeColor = Theme.Mix(Color.FromArgb(100, 110, 122));
                 cap.TextAlign = ContentAlignment.MiddleCenter;
                 cap.Dock = DockStyle.Fill;
                 box.Controls.Add(cap);
@@ -1131,14 +1243,14 @@ namespace FileDiffTool
             {
                 _mapA = map; _dirA = dir;
                 _lblPathA.Text = dir;
-                _lblPathA.ForeColor = Color.FromArgb(38, 50, 66);
+                _lblPathA.ForeColor = Theme.Mix(Color.FromArgb(38, 50, 66));
                 _btnClearA.Enabled = true;
             }
             else
             {
                 _mapB = map; _dirB = dir;
                 _lblPathB.Text = dir;
-                _lblPathB.ForeColor = Color.FromArgb(38, 50, 66);
+                _lblPathB.ForeColor = Theme.Mix(Color.FromArgb(38, 50, 66));
                 _btnClearB.Enabled = true;
             }
 
@@ -1178,7 +1290,7 @@ namespace FileDiffTool
         {
             _mapA = null; _dirA = string.Empty;
             _lblPathA.Text = "尚未选择文件夹";
-            _lblPathA.ForeColor = Color.Gray;
+            _lblPathA.ForeColor = Theme.Mix(Color.Gray);
             _lblInfoA.Text = "";
             _btnClearA.Enabled = false;
             ClearResultsInternal();
@@ -1189,7 +1301,7 @@ namespace FileDiffTool
         {
             _mapB = null; _dirB = string.Empty;
             _lblPathB.Text = "尚未选择文件夹";
-            _lblPathB.ForeColor = Color.Gray;
+            _lblPathB.ForeColor = Theme.Mix(Color.Gray);
             _lblInfoB.Text = "";
             _btnClearB.Enabled = false;
             ClearResultsInternal();

@@ -91,6 +91,8 @@ namespace FileDiffTool
             CancelButton = cancel;
 
             UpdateCount();
+
+            Theme.Apply(this);   // 忽略规则窗体也跟着主题走
         }
 
         // ── DPI 缩放 ────────────────────────────────────────
