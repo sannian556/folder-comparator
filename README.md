@@ -14,7 +14,8 @@
 |---|---|
 | **在线使用**（最省事） | <https://sannian556.github.io/folder-comparator/> —— 页面上半部分就是工具本体，页内还有下载按钮 |
 | **下载完整版** | [`docs/文件比较器.zip`](docs/文件比较器.zip)（约 83 KB），解压后双击 `文件比较器.exe` |
-| **从发布页下载** | [Releases v1.0](https://github.com/sannian556/folder-comparator/releases/tag/v1.0) —— 附件名是 `file-comparator-v1.0.zip`（GitHub 不接受中文附件名），内容与上面那个包完全一样 |
+| **从发布页下载** | [Releases v1.1](https://github.com/sannian556/folder-comparator/releases/tag/v1.1) —— 附件名是 `file-comparator-v1.1.zip`（GitHub 不接受中文附件名），内容与上面那个包完全一样 |
+| **更新日志** | [更新日志.md](更新日志.md) —— 每个版本改了什么 |
 | **自己编译** | 见下方「从源码构建」，只需要系统自带的 .NET Framework，不用装 SDK |
 
 > **站点已经开好了**：本仓库 Settings → Pages → Source = 「GitHub Actions」，
