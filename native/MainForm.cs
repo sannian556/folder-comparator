@@ -36,11 +36,11 @@ namespace FileDiffTool
         private int _historyMismatch;          // 还原时统计出来的"与记录不一致"文件数
         private IgnoreRules _rules = new IgnoreRules();
         private int _rescanStage;   // 规则变更后重扫：0 空闲 / 1 等 A 扫完 / 2 等 B 扫完
-        private ProgressBar _progress;
+        private ThemeProgress _progress;
         private Label _lblStatus;
         private Label[] _countLabels = new Label[4];
-        private TabControl _tabs;
-        private TabPage[] _pages = new TabPage[4];
+        private TabStrip _tabs;
+        private Panel[] _pages = new Panel[4];
         private ListView[] _lists = new ListView[4];
         private ContextMenuStrip _menu;
 
@@ -455,18 +455,36 @@ namespace FileDiffTool
             root.Controls.Add(BuildProgressArea(), 0, 3);
             root.Controls.Add(BuildSummaryArea(), 0, 4);
 
-            _tabs = new TabControl();
-            _tabs.Dock = DockStyle.Fill;
+            // 分页区：不用原生 TabControl（它的标签带边线和外框是系统按浅色画的，改不动），
+            // 换成"自绘标签条 + 内容面板"，这样标签、边线、背景全归主题管。
+            _tabs = new TabStrip();
+            _tabs.Dock = DockStyle.Top;
+            _tabs.Height = S(28);
             string[] titles = new string[] { "内容不同", "仅在 B 中存在", "仅在 A 中存在", "完全相同" };
+            _tabs.Titles = titles;
+
+            Panel content = new Panel();
+            content.Dock = DockStyle.Fill;
             for (int i = 0; i < 4; i++)
             {
-                _pages[i] = new TabPage(titles[i]);
-                _pages[i].BackColor = Color.White;
+                _pages[i] = new Panel();
+                _pages[i].Dock = DockStyle.Fill;
+                _pages[i].Visible = (i == 0);
                 _lists[i] = BuildListView(i);
                 _pages[i].Controls.Add(_lists[i]);
-                _tabs.TabPages.Add(_pages[i]);
+                content.Controls.Add(_pages[i]);
             }
-            root.Controls.Add(_tabs, 0, 5);
+            _tabs.SelectedIndexChanged += delegate
+            {
+                for (int i = 0; i < _pages.Length; i++)
+                    _pages[i].Visible = (i == _tabs.SelectedIndex);
+            };
+
+            Panel tabHost = new Panel();
+            tabHost.Dock = DockStyle.Fill;
+            tabHost.Controls.Add(content);      // 先加内容（Fill），后加标签条（Top）—— Dock 顺序才对
+            tabHost.Controls.Add(_tabs);
+            root.Controls.Add(tabHost, 0, 5);
             root.Controls.Add(BuildContactBar(), 0, 6);
 
             Controls.Add(root);
@@ -910,7 +928,7 @@ namespace FileDiffTool
             // —— 125% DPI 下实测文字底部少了 4 行像素（"文字显示不全"的真正原因）。
             p.Margin = new Padding(0);
 
-            _progress = new ProgressBar();
+            _progress = new ThemeProgress();
             _progress.Location = new Point(2, 8);
             _progress.Size = new Size(560, 16);
             _progress.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
