@@ -198,8 +198,9 @@ namespace FileDiffTool
             if (c is TextBox || c is ListView || c is TreeView || c is TabControl || c is ProgressBar)
                 ApplyScrollTheme(c);
 
-            // GroupBox 的边框和标题是系统画的，改 BackColor 管不到它，试着用 uxtheme 压深
-            if (c is GroupBox && !IsLight) ApplyScrollTheme(c);
+            // GroupBox 的边框和标题是系统画的（uxtheme 压不动它），自己描一圈盖掉
+            GroupBox gb = c as GroupBox;
+            if (gb != null) StyleGroupBox(gb);
 
             Form f = c as Form;
             if (f != null && f.Handle != IntPtr.Zero) ApplyTitleBar(f.Handle, IsLight);
@@ -272,6 +273,31 @@ namespace FileDiffTool
             TextRenderer.DrawText(e.Graphics, e.SubItem.Text, lv.Font, r, c, flags);
         }
 
+        // ============================================================ 分组框
+        /// <summary>
+        /// GroupBox 的边框是系统（uxtheme）画的，改 BackColor 完全不生效，深色下就是一圈浅灰线。
+        /// 做法：在它画完之后自己照原位再描一圈主题色的框，把系统那条盖掉。
+        /// </summary>
+        public static void StyleGroupBox(GroupBox g)
+        {
+            if (g == null) return;
+            g.Paint -= OnPaintGroupBox;
+            if (IsLight) return;
+            g.ForeColor = SubText;          // 标题文字也是系统画的，颜色靠 ForeColor
+            g.Paint += OnPaintGroupBox;
+        }
+
+        private static void OnPaintGroupBox(object sender, PaintEventArgs e)
+        {
+            GroupBox g = sender as GroupBox;
+            if (g == null) return;
+            // 系统那条框线大致落在标题文字的半高处；画粗一点确保盖住（差 1px 会露出双线）
+            int top = g.Font.Height / 2;
+            Rectangle r = new Rectangle(0, top, g.Width - 1, g.Height - top - 1);
+            using (Pen p = new Pen(Border, 2f))
+                e.Graphics.DrawRectangle(p, r);
+        }
+
         // ============================================================ 表格
         /// <summary>
         /// DataGridView 有自己一套颜色属性，光设 BackColor 不够：表头、单元格、网格线、选中色各有各的；
@@ -325,6 +351,26 @@ namespace FileDiffTool
             tc.ForeColor = Text;
             tc.DrawItem -= OnDrawTabItem;
             tc.DrawItem += OnDrawTabItem;
+            tc.Paint -= OnPaintTabFrame;
+            tc.Paint += OnPaintTabFrame;      // 标签带和外框那几条线也是系统画的，自己描一遍
+        }
+
+        /// <summary>
+        /// TabControl 的标签带上下边线、以及它整个外框，都是系统按浅色画的。
+        /// 标签本身由 OnDrawTabItem 自绘，这里只补那几条线（画在标签带边缘，不压文字）。
+        /// </summary>
+        private static void OnPaintTabFrame(object sender, PaintEventArgs e)
+        {
+            TabControl tc = sender as TabControl;
+            if (tc == null || IsLight) return;
+            Rectangle d = tc.DisplayRectangle;
+            using (Pen p = new Pen(Border))
+            {
+                e.Graphics.DrawLine(p, 0, 1, tc.Width, 1);
+                e.Graphics.DrawLine(p, 0, d.Top - 1, tc.Width, d.Top - 1);
+                e.Graphics.DrawRectangle(p, 0, 0, tc.Width - 1, tc.Height - 1);
+                e.Graphics.DrawRectangle(p, d.Left, d.Top, d.Width - 1, d.Height - 1);
+            }
         }
 
         private static void OnDrawTabItem(object sender, DrawItemEventArgs e)
@@ -343,6 +389,16 @@ namespace FileDiffTool
             string t = tc.TabPages[e.Index].Text;
             TextRenderer.DrawText(e.Graphics, t, tc.Font, r, active ? Text : SubText,
                 TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis);
+
+            // 最后一个标签右边到控件右边缘那一截，系统仍会画成浅色 —— 自己按主题补上
+            if (e.Index == tc.TabCount - 1 && r.Right < tc.Width)
+            {
+                Rectangle rest = new Rectangle(r.Right, r.Top, tc.Width - r.Right, r.Height);
+                using (SolidBrush b2 = new SolidBrush(PanelAlt))
+                    e.Graphics.FillRectangle(b2, rest);
+                using (Pen p2 = new Pen(Border))
+                    e.Graphics.DrawLine(p2, rest.Left, rest.Bottom - 1, rest.Right, rest.Bottom - 1);
+            }
         }
     }
 }
